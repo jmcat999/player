@@ -61,3 +61,19 @@ func TestParserUsesJavaActionLabelsOnly(t *testing.T) {
 		t.Fatalf("diamond count = %d, want 0 for non-Java action label", got)
 	}
 }
+
+func TestParserSkipsJavaHeaderVariants(t *testing.T) {
+	location := time.FixedZone("CST", 8*60*60)
+	input := strings.NewReader(strings.Join([]string{
+		"not-date,time,鍚,琛,x,y,z,dimension,x2,y2,z2,dimension2,detail1,detail2",
+		"2026-04-01,19:19:00,Alex,破坏方块,0,10,0,overworld,0,10,0,overworld,minecraft:diamond_ore,",
+	}, "\n"))
+
+	parsed, err := newParser(location).parse(input)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if parsed.rowCount != 1 {
+		t.Fatalf("rowCount = %d, want 1 after skipping Java-compatible header", parsed.rowCount)
+	}
+}

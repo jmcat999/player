@@ -201,19 +201,18 @@ func isHeader(columns []string) bool {
 	if len(columns) < 4 {
 		return false
 	}
-	first := stripBOM(columns[0])
+	first := strings.TrimSpace(stripBOM(columns[0]))
 	if _, ok := parseDate(first, time.Local); ok {
 		return false
 	}
-	third := columns[2]
-	fourth := columns[3]
-	if strings.Contains(first, "日期") || strings.Contains(third, "玩家") || strings.Contains(fourth, "行为") {
-		return true
-	}
+	third := strings.TrimSpace(columns[2])
+	fourth := strings.TrimSpace(columns[3])
 	return strings.EqualFold(first, "date") ||
 		strings.Contains(first, "日期") ||
 		strings.Contains(third, "玩家") ||
-		strings.Contains(fourth, "行为")
+		strings.Contains(third, "鍚") ||
+		strings.Contains(fourth, "行为") ||
+		strings.Contains(fourth, "琛")
 }
 
 func parseDateTime(columns []string, location *time.Location) (time.Time, bool) {
