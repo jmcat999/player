@@ -1,0 +1,73 @@
+{
+  "api_base_url": {
+    "description": "接口服务地址",
+    "type": "string",
+    "default": "http://127.0.0.1:9493",
+    "hint": "机器人请求后端接口用的地址，例如 http://127.0.0.1:9493 或 http://后端内网IP:9493。不要加 /api，不要以 / 结尾。"
+  },
+  "share_base_url": {
+    "description": "分享链接",
+    "type": "string",
+    "default": "http://127.0.0.1:9493",
+    "hint": "发到群里的详细足迹链接使用这个地址，例如 http://服务器IP:9493 或公网域名。不要加 /api，不要以 / 结尾；手机或电脑必须能访问。"
+  },
+  "api_key": {
+    "description": "插件密钥",
+    "type": "string",
+    "default": "",
+    "hint": "登录 Vue 管理后台，在系统设置里复制 AstrBot 插件密钥。"
+  },
+  "enable_xray_group_send": {
+    "description": "启用矿透分析群发送",
+    "type": "bool",
+    "default": false,
+    "hint": "开启后，Vue 矿透分析详情页点击“发送到Q群”会由 AstrBot 自动发送风险提示到配置的群。"
+  },
+  "xray_group_id": {
+    "description": "矿透分析发送群号",
+    "type": "string",
+    "default": "",
+    "hint": "填写要接收矿透风险提示的 QQ 群号。插件会优先通过 OneBot/aiocqhttp 直发；高级用法也可以填写完整 unified_msg_origin。"
+  },
+  "timeout_seconds": {
+    "description": "请求超时时间（秒）",
+    "type": "float",
+    "default": 8.0
+  },
+  "ranking_limit": {
+    "description": "排行榜显示人数",
+    "type": "int",
+    "default": 10,
+    "hint": "范围 1-20，按破坏 + 放置合计排序。"
+  },
+  "enable_rankings": {
+    "description": "启用肝帝榜命令",
+    "type": "bool",
+    "default": true,
+    "hint": "关闭后 /肝帝榜、/排行榜、/方块排行榜 会提示命令已关闭。"
+  },
+  "enable_active_rankings": {
+    "description": "启用活跃榜命令",
+    "type": "bool",
+    "default": true,
+    "hint": "关闭后 /活跃榜、/活跃玩家、/最近活跃 会提示命令已关闭。"
+  },
+  "active_days": {
+    "description": "活跃榜统计天数",
+    "type": "int",
+    "default": 7,
+    "hint": "范围 1-90，活跃榜会返回最近 N 天的活跃玩家。"
+  },
+  "from_date": {
+    "description": "统计开始日期",
+    "type": "string",
+    "default": "",
+    "hint": "可选，格式 YYYY-MM-DD。留空表示最早。"
+  },
+  "to_date": {
+    "description": "统计结束日期",
+    "type": "string",
+    "default": "",
+    "hint": "可选，格式 YYYY-MM-DD。留空表示最新。"
+  }
+}
