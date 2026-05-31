@@ -13,9 +13,21 @@ ghcr.io/jmcat999/player-backend:latest
 ghcr.io/jmcat999/player-frontend:latest
 ```
 
-服务器只需要 Docker / Docker Compose：
+服务器只需要 Docker / Docker Compose，不需要 clone 整个项目。新建一个空目录，直接下载部署文件：
 
 ```bash
+mkdir -p /vol1/1000/docker/player
+cd /vol1/1000/docker/player
+curl -fsSL https://raw.githubusercontent.com/jmcat999/player/main/docker-compose.yml -o docker-compose.yml
+mkdir -p docker-data/synced-logs/main docker-data/synced-logs/sub docker-data/mysql
+docker compose pull
+docker compose up -d
+```
+
+如果你想保留源码再部署，也可以 clone，但要在空目录的上一级执行：
+
+```bash
+cd /vol1/1000/docker
 git clone https://github.com/jmcat999/player.git
 cd player
 docker compose pull
@@ -38,7 +50,12 @@ docker compose up -d
 
 生产环境请先修改 `docker-compose.yml` 里的 `APP_ADMIN_PASSWORD`、`APP_ADMIN_JWT_SECRET`、MySQL 密码和对外端口。账号创建后，再改 `APP_ADMIN_PASSWORD` 不会覆盖旧密码，后续请在管理后台改密码。
 
-如果 `docker compose pull` 提示没有权限，说明 GHCR 镜像包还不是公开的。可以在 GitHub 仓库的 Packages 里把两个镜像设为 Public，或者在服务器执行：
+如果 `docker compose pull` 提示 `unauthorized`，通常是两个原因之一：
+
+- GitHub Actions 还没成功构建并推送 `latest` 镜像。
+- GHCR 镜像包默认是 Private，还没有设置成 Public。
+
+处理方式：先打开 GitHub 仓库的 Actions 页面，确认最新的 `Build` 已成功；然后在 GitHub 仓库的 Packages 里把 `player-backend` 和 `player-frontend` 两个镜像设为 Public。也可以不公开镜像，在服务器登录 GHCR：
 
 ```bash
 echo YOUR_GITHUB_TOKEN | docker login ghcr.io -u jmcat999 --password-stdin
@@ -48,7 +65,16 @@ echo YOUR_GITHUB_TOKEN | docker login ghcr.io -u jmcat999 --password-stdin
 
 ## 更新部署
 
-以后更新代码后，服务器执行：
+如果你是免 clone 部署，更新时执行：
+
+```bash
+cd /vol1/1000/docker/player
+curl -fsSL https://raw.githubusercontent.com/jmcat999/player/main/docker-compose.yml -o docker-compose.yml
+docker compose pull
+docker compose up -d
+```
+
+如果你是 clone 源码部署，更新时执行：
 
 ```bash
 git pull
