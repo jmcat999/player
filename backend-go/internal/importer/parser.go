@@ -253,15 +253,9 @@ func playerName(columns []string) string {
 func parseAction(raw string) string {
 	normalized := strings.TrimSpace(raw)
 	switch normalized {
-	case "破坏方块":
+	case "破坏方块", "鐮村潖鏂瑰潡":
 		return "DESTROY_BLOCK"
-	case "放置方块":
-		return "PLACE_BLOCK"
-	}
-	switch normalized {
-	case "破坏方块", "DESTROY_BLOCK", "destroy_block", "break", "block_break":
-		return "DESTROY_BLOCK"
-	case "放置方块", "PLACE_BLOCK", "place_block", "place", "block_place":
+	case "放置方块", "鏀剧疆鏂瑰潡":
 		return "PLACE_BLOCK"
 	default:
 		return ""

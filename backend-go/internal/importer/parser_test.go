@@ -39,3 +39,25 @@ func TestParserCountsChineseBlockActions(t *testing.T) {
 		t.Fatalf("oak sapling count = %d, want 1", got)
 	}
 }
+
+func TestParserUsesJavaActionLabelsOnly(t *testing.T) {
+	location := time.FixedZone("CST", 8*60*60)
+	input := strings.NewReader(strings.Join([]string{
+		"date,time,player,action,x,y,z,dimension,x2,y2,z2,dimension2,detail1,detail2",
+		"2026-04-01,19:19:00,Alex,DESTROY_BLOCK,0,10,0,overworld,0,10,0,overworld,minecraft:diamond_ore,",
+	}, "\n"))
+
+	parsed, err := newParser(location).parse(input)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if parsed.ignoredCount != 1 {
+		t.Fatalf("ignoredCount = %d, want 1", parsed.ignoredCount)
+	}
+	if len(parsed.stats) != 0 {
+		t.Fatalf("stats count = %d, want 0 for non-Java action label", len(parsed.stats))
+	}
+	if got := parsed.oreCounts[typedPlayerKey{playerName: "Alex", typ: "DIAMOND_ORE"}]; got != 0 {
+		t.Fatalf("diamond count = %d, want 0 for non-Java action label", got)
+	}
+}

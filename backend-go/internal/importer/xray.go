@@ -475,7 +475,7 @@ type point3 struct {
 }
 
 func xrayEventFromRow(file RemoteLogFile, lineNumber int64, columns []string, location *time.Location) (xrayEvent, bool) {
-	if parseAction(valueAt(columns, 3)) != "DESTROY_BLOCK" {
+	if !isXrayDestroyAction(valueAt(columns, 3)) {
 		return xrayEvent{}, false
 	}
 	happenedAt, ok := parseDateTime(columns, location)
@@ -1105,6 +1105,14 @@ func firstKnownXrayBlock(detail1, detail2 string) string {
 		return first
 	}
 	return second
+}
+
+func isXrayDestroyAction(action string) bool {
+	if parseAction(action) == "DESTROY_BLOCK" {
+		return true
+	}
+	normalized := strings.ToLower(strings.TrimSpace(action))
+	return strings.Contains(normalized, "破坏") || strings.Contains(normalized, "destroy") || strings.Contains(normalized, "break")
 }
 
 func suspiciousRareDepth(oreType string, point point3) bool {

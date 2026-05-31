@@ -305,7 +305,7 @@ type logQueryCriteria struct {
 func (c logQueryCriteria) shouldScanFile(fileName string, location *time.Location) bool {
 	fileDate := extractLogDate(fileName, location)
 	if fileDate == nil {
-		return true
+		return false
 	}
 	if c.fromDate != nil && fileDate.Before(*c.fromDate) {
 		return false
@@ -323,18 +323,6 @@ func (c logQueryCriteria) matches(columns []string) bool {
 		}
 		if c.keyword != "" && !containsFold(valueAt(columns, 12), c.keyword) && !containsFold(valueAt(columns, 13), c.keyword) {
 			return false
-		}
-		if c.fromDate != nil || c.toDate != nil {
-			rowDate, ok := parseDate(stripBOM(valueAt(columns, 0)), time.Local)
-			if !ok {
-				return false
-			}
-			if c.fromDate != nil && rowDate.Before(*c.fromDate) {
-				return false
-			}
-			if c.toDate != nil && rowDate.After(*c.toDate) {
-				return false
-			}
 		}
 		return true
 	}
