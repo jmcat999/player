@@ -2410,6 +2410,44 @@ function toggleAllImportFileSelection(checked) {
 
         <div class="xray-detail-body">
           <section class="xray-detail-section xray-toggle-section">
+            <h4>筛选周期总量</h4>
+            <div class="xray-detail-grid">
+              <div>
+                <span>破坏方块</span>
+                <strong>{{ formatNumber(xrayAnalysisValue(xraySharePlayer, 'analysisBreaks', 'miningSessionBreaks')) }}</strong>
+              </div>
+              <div>
+                <span>地下破坏</span>
+                <strong>{{ formatNumber(xrayAnalysisValue(xraySharePlayer, 'analysisUndergroundBreaks', 'miningSessionUndergroundBreaks')) }}</strong>
+              </div>
+              <div>
+                <span>稀有矿</span>
+                <strong>{{ formatNumber(xrayAnalysisValue(xraySharePlayer, 'analysisRareOreBreaks', 'miningSessionRareOreBreaks')) }}</strong>
+              </div>
+              <div>
+                <span>钻石矿</span>
+                <strong>{{ formatNumber(xrayAnalysisValue(xraySharePlayer, 'analysisDiamondOreBreaks', 'miningSessionDiamondOreBreaks')) }}</strong>
+              </div>
+              <div>
+                <span>远古残骸</span>
+                <strong>{{ formatNumber(xrayAnalysisValue(xraySharePlayer, 'analysisAncientDebrisBreaks', 'miningSessionAncientDebrisBreaks')) }}</strong>
+              </div>
+              <div>
+                <span>地下稀有矿占比</span>
+                <strong>{{ xrayAnalysisRareRatioText(xraySharePlayer) }}</strong>
+              </div>
+              <div>
+                <span>十分钟挖取峰值</span>
+                <strong>{{ formatNumber(xrayAnalysisValue(xraySharePlayer, 'analysisPeakRareOreWindowCount', 'peakRareOreWindowCount')) }}</strong>
+              </div>
+              <div>
+                <span>周期追矿证据</span>
+                <strong>{{ formatNumber(xrayAnalysisTrackingEvidenceCount(xraySharePlayer)) }}</strong>
+              </div>
+            </div>
+          </section>
+
+          <section class="xray-detail-section xray-toggle-section">
             <h4>最可疑挖矿会话</h4>
             <div class="xray-detail-grid">
               <div>
@@ -2460,44 +2498,6 @@ function toggleAllImportFileSelection(checked) {
                   {{ formatDateTime(xraySharePlayer.peakRareOreWindowStart) }} - {{ formatDateTime(xraySharePlayer.peakRareOreWindowEnd) }}
                 </strong>
                 <strong v-else>-</strong>
-              </div>
-            </div>
-          </section>
-
-          <section class="xray-detail-section xray-toggle-section">
-            <h4>筛选周期总量</h4>
-            <div class="xray-detail-grid">
-              <div>
-                <span>破坏方块</span>
-                <strong>{{ formatNumber(xrayAnalysisValue(xraySharePlayer, 'analysisBreaks', 'miningSessionBreaks')) }}</strong>
-              </div>
-              <div>
-                <span>地下破坏</span>
-                <strong>{{ formatNumber(xrayAnalysisValue(xraySharePlayer, 'analysisUndergroundBreaks', 'miningSessionUndergroundBreaks')) }}</strong>
-              </div>
-              <div>
-                <span>稀有矿</span>
-                <strong>{{ formatNumber(xrayAnalysisValue(xraySharePlayer, 'analysisRareOreBreaks', 'miningSessionRareOreBreaks')) }}</strong>
-              </div>
-              <div>
-                <span>钻石矿</span>
-                <strong>{{ formatNumber(xrayAnalysisValue(xraySharePlayer, 'analysisDiamondOreBreaks', 'miningSessionDiamondOreBreaks')) }}</strong>
-              </div>
-              <div>
-                <span>远古残骸</span>
-                <strong>{{ formatNumber(xrayAnalysisValue(xraySharePlayer, 'analysisAncientDebrisBreaks', 'miningSessionAncientDebrisBreaks')) }}</strong>
-              </div>
-              <div>
-                <span>地下稀有矿占比</span>
-                <strong>{{ xrayAnalysisRareRatioText(xraySharePlayer) }}</strong>
-              </div>
-              <div>
-                <span>十分钟挖取峰值</span>
-                <strong>{{ formatNumber(xrayAnalysisValue(xraySharePlayer, 'analysisPeakRareOreWindowCount', 'peakRareOreWindowCount')) }}</strong>
-              </div>
-              <div>
-                <span>周期追矿证据</span>
-                <strong>{{ formatNumber(xrayAnalysisTrackingEvidenceCount(xraySharePlayer)) }}</strong>
               </div>
             </div>
           </section>
@@ -3783,6 +3783,44 @@ function toggleAllImportFileSelection(checked) {
 
           <div class="xray-detail-body">
             <section class="xray-detail-section xray-toggle-section">
+              <h4>筛选周期总量</h4>
+              <div class="xray-detail-grid">
+                <div>
+                  <span>破坏方块</span>
+                  <strong>{{ formatNumber(xrayAnalysisValue(selectedXrayDetailPlayer, 'analysisBreaks', 'miningSessionBreaks')) }}</strong>
+                </div>
+                <div>
+                  <span>地下破坏</span>
+                  <strong>{{ formatNumber(xrayAnalysisValue(selectedXrayDetailPlayer, 'analysisUndergroundBreaks', 'miningSessionUndergroundBreaks')) }}</strong>
+                </div>
+                <div>
+                  <span>稀有矿</span>
+                  <strong>{{ formatNumber(xrayAnalysisValue(selectedXrayDetailPlayer, 'analysisRareOreBreaks', 'miningSessionRareOreBreaks')) }}</strong>
+                </div>
+                <div>
+                  <span>钻石矿</span>
+                  <strong>{{ formatNumber(xrayAnalysisValue(selectedXrayDetailPlayer, 'analysisDiamondOreBreaks', 'miningSessionDiamondOreBreaks')) }}</strong>
+                </div>
+                <div>
+                  <span>远古残骸</span>
+                  <strong>{{ formatNumber(xrayAnalysisValue(selectedXrayDetailPlayer, 'analysisAncientDebrisBreaks', 'miningSessionAncientDebrisBreaks')) }}</strong>
+                </div>
+                <div>
+                  <span>地下稀有矿占比</span>
+                  <strong>{{ xrayAnalysisRareRatioText(selectedXrayDetailPlayer) }}</strong>
+                </div>
+                <div>
+                  <span>十分钟挖取峰值</span>
+                  <strong>{{ formatNumber(xrayAnalysisValue(selectedXrayDetailPlayer, 'analysisPeakRareOreWindowCount', 'peakRareOreWindowCount')) }}</strong>
+                </div>
+                <div>
+                  <span>周期追矿证据</span>
+                  <strong>{{ formatNumber(xrayAnalysisTrackingEvidenceCount(selectedXrayDetailPlayer)) }}</strong>
+                </div>
+              </div>
+            </section>
+
+            <section class="xray-detail-section xray-toggle-section">
               <h4>最可疑挖矿会话</h4>
               <div class="xray-detail-grid">
                 <div>
@@ -3833,44 +3871,6 @@ function toggleAllImportFileSelection(checked) {
                     {{ formatDateTime(selectedXrayDetailPlayer.peakRareOreWindowStart) }} - {{ formatDateTime(selectedXrayDetailPlayer.peakRareOreWindowEnd) }}
                   </strong>
                   <strong v-else>-</strong>
-                </div>
-              </div>
-            </section>
-
-            <section class="xray-detail-section xray-toggle-section">
-              <h4>筛选周期总量</h4>
-              <div class="xray-detail-grid">
-                <div>
-                  <span>破坏方块</span>
-                  <strong>{{ formatNumber(xrayAnalysisValue(selectedXrayDetailPlayer, 'analysisBreaks', 'miningSessionBreaks')) }}</strong>
-                </div>
-                <div>
-                  <span>地下破坏</span>
-                  <strong>{{ formatNumber(xrayAnalysisValue(selectedXrayDetailPlayer, 'analysisUndergroundBreaks', 'miningSessionUndergroundBreaks')) }}</strong>
-                </div>
-                <div>
-                  <span>稀有矿</span>
-                  <strong>{{ formatNumber(xrayAnalysisValue(selectedXrayDetailPlayer, 'analysisRareOreBreaks', 'miningSessionRareOreBreaks')) }}</strong>
-                </div>
-                <div>
-                  <span>钻石矿</span>
-                  <strong>{{ formatNumber(xrayAnalysisValue(selectedXrayDetailPlayer, 'analysisDiamondOreBreaks', 'miningSessionDiamondOreBreaks')) }}</strong>
-                </div>
-                <div>
-                  <span>远古残骸</span>
-                  <strong>{{ formatNumber(xrayAnalysisValue(selectedXrayDetailPlayer, 'analysisAncientDebrisBreaks', 'miningSessionAncientDebrisBreaks')) }}</strong>
-                </div>
-                <div>
-                  <span>地下稀有矿占比</span>
-                  <strong>{{ xrayAnalysisRareRatioText(selectedXrayDetailPlayer) }}</strong>
-                </div>
-                <div>
-                  <span>十分钟挖取峰值</span>
-                  <strong>{{ formatNumber(xrayAnalysisValue(selectedXrayDetailPlayer, 'analysisPeakRareOreWindowCount', 'peakRareOreWindowCount')) }}</strong>
-                </div>
-                <div>
-                  <span>周期追矿证据</span>
-                  <strong>{{ formatNumber(xrayAnalysisTrackingEvidenceCount(selectedXrayDetailPlayer)) }}</strong>
                 </div>
               </div>
             </section>
