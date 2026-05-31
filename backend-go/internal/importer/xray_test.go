@@ -39,14 +39,20 @@ func TestCollectMetricsCountsDiamondAndAncientDebrisLikeJava(t *testing.T) {
 	if metrics.ancientDebrisBreaks != 1 {
 		t.Fatalf("ancientDebrisBreaks = %d, want 1", metrics.ancientDebrisBreaks)
 	}
-	if metrics.rareOreBreaks != 1 {
-		t.Fatalf("rareOreBreaks = %d, want 1", metrics.rareOreBreaks)
+	if metrics.rareOreBreaks != 3 {
+		t.Fatalf("rareOreBreaks = %d, want 3", metrics.rareOreBreaks)
+	}
+	if metrics.suspiciousRareOreBreaks != 1 {
+		t.Fatalf("suspiciousRareOreBreaks = %d, want 1", metrics.suspiciousRareOreBreaks)
 	}
 	if got := metrics.oreCounts["DEEPSLATE_DIAMOND_ORE"]; got != 2 {
 		t.Fatalf("oreCounts[DEEPSLATE_DIAMOND_ORE] = %d, want 2", got)
 	}
-	if got := metrics.rareOreCounts["DEEPSLATE_DIAMOND_ORE"]; got != 1 {
-		t.Fatalf("rareOreCounts[DEEPSLATE_DIAMOND_ORE] = %d, want 1", got)
+	if got := metrics.rareOreCounts["DEEPSLATE_DIAMOND_ORE"]; got != 2 {
+		t.Fatalf("rareOreCounts[DEEPSLATE_DIAMOND_ORE] = %d, want 2", got)
+	}
+	if got := metrics.rareOreCounts["ANCIENT_DEBRIS"]; got != 1 {
+		t.Fatalf("rareOreCounts[ANCIENT_DEBRIS] = %d, want 1", got)
 	}
 }
 
