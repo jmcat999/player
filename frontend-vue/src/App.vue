@@ -232,8 +232,8 @@ const maxDailyTotal = computed(() => {
 
 const leadingPlayers = computed(() => players.value.slice(0, 8))
 const operationFiles = computed(() => lastOperation.value?.result?.files || [])
-const importPageFiles = computed(() => importJob.value?.files || importFiles.value)
 const importJobRunning = computed(() => importJob.value?.status === 'RUNNING' || importJob.value?.status === 'PENDING')
+const importPageFiles = computed(() => importJobRunning.value ? (importJob.value?.files || importFiles.value) : importFiles.value)
 const syncJobRunning = computed(() => syncJob.value?.status === 'RUNNING' || syncJob.value?.status === 'PENDING')
 const selectedLogQueryResult = computed(() => logQueryResultFor(logQueryServerId.value) || null)
 const selectedXrayAnalysisResult = computed(() => xrayAnalysisResultFor(logQueryServerId.value) || null)

@@ -1,9 +1,11 @@
 import asyncio
 import inspect
+import json
 from datetime import date, datetime, timedelta, timezone
 from typing import Any
 
 import httpx
+import websockets
 from astrbot.api import AstrBotConfig, logger
 from astrbot.api.event import AstrMessageEvent, MessageChain, filter
 from astrbot.api.star import Context, Star, register
@@ -14,7 +16,7 @@ from astrbot.core.star.filter.command import GreedyStr
     "player_stats",
     "Codex",
     "查询 Minecraft 玩家在主服和 2服的方块统计",
-    "0.10.2",
+    "0.10.3",
 )
 class PlayerStatsPlugin(Star):
     SERVERS = (
@@ -270,12 +272,51 @@ class PlayerStatsPlugin(Star):
 
     async def _xray_group_sender_loop(self):
         while True:
-            await asyncio.sleep(self._xray_group_poll_seconds())
             if not self._config_bool("enable_xray_group_send", False):
+                await asyncio.sleep(self._xray_group_poll_seconds())
                 continue
             if not self._xray_group_target():
+                await asyncio.sleep(self._xray_group_poll_seconds())
                 continue
+            if self._config_bool("enable_xray_group_ws", True):
+                try:
+                    await self._xray_group_ws_loop()
+                except asyncio.CancelledError:
+                    raise
+                except Exception as ex:
+                    logger.warning(f"xray group websocket disconnected, fallback to polling: {ex}")
+                    await self._send_pending_xray_group_messages()
+                    await asyncio.sleep(self._xray_group_poll_seconds())
+            else:
+                await self._send_pending_xray_group_messages()
+                await asyncio.sleep(self._xray_group_poll_seconds())
+
+    async def _xray_group_ws_loop(self):
+        headers = self._auth_headers()
+        if not headers.get("X-Player-Stats-Key"):
+            raise RuntimeError("api_key is required for xray group websocket")
+        connect_kwargs = {
+            "ping_interval": 20,
+            "ping_timeout": 20,
+            "open_timeout": float(self.config.get("timeout_seconds", 8)),
+        }
+        header_param = "additional_headers"
+        try:
+            if "additional_headers" not in inspect.signature(websockets.connect).parameters:
+                header_param = "extra_headers"
+        except (TypeError, ValueError):
+            pass
+        connect_kwargs[header_param] = headers
+        async with websockets.connect(self._xray_group_ws_url(), **connect_kwargs) as websocket:
             await self._send_pending_xray_group_messages()
+            async for raw_message in websocket:
+                try:
+                    message = json.loads(raw_message)
+                except json.JSONDecodeError as ex:
+                    logger.warning(f"invalid xray websocket message: {ex}")
+                    continue
+                if isinstance(message, dict):
+                    await self._deliver_xray_group_message(message)
 
     async def _send_pending_xray_group_messages(self):
         try:
@@ -285,19 +326,22 @@ class PlayerStatsPlugin(Star):
             return
 
         for message in messages:
-            message_id = message.get("id")
-            try:
-                text = self._format_xray_group_message(message)
-                await self._send_xray_group_text(text)
-                if message_id is not None:
-                    await self._mark_xray_group_message(message_id, True, "")
-            except Exception as ex:
-                logger.warning(f"send xray group message failed: {ex}")
-                if message_id is not None:
-                    try:
-                        await self._mark_xray_group_message(message_id, False, str(ex))
-                    except Exception as mark_ex:
-                        logger.warning(f"mark xray group message failed: {mark_ex}")
+            await self._deliver_xray_group_message(message)
+
+    async def _deliver_xray_group_message(self, message: dict[str, Any]):
+        message_id = message.get("id")
+        try:
+            text = self._format_xray_group_message(message)
+            await self._send_xray_group_text(text)
+            if message_id is not None:
+                await self._mark_xray_group_message(message_id, True, "")
+        except Exception as ex:
+            logger.warning(f"send xray group message failed: {ex}")
+            if message_id is not None:
+                try:
+                    await self._mark_xray_group_message(message_id, False, str(ex))
+                except Exception as mark_ex:
+                    logger.warning(f"mark xray group message failed: {mark_ex}")
 
     async def _fetch_pending_xray_group_messages(self) -> list[dict[str, Any]]:
         base_url = self._api_base_url()
@@ -486,6 +530,14 @@ class PlayerStatsPlugin(Star):
     def _api_base_url(self) -> str:
         raw_base_url = str(self.config.get("api_base_url", "http://127.0.0.1:9493")).strip()
         return (raw_base_url or "http://127.0.0.1:9493").rstrip("/")
+
+    def _xray_group_ws_url(self) -> str:
+        base_url = self._api_base_url()
+        if base_url.startswith("https://"):
+            return "wss://" + base_url[len("https://"):] + "/api/share/xray-group-messages/ws"
+        if base_url.startswith("http://"):
+            return "ws://" + base_url[len("http://"):] + "/api/share/xray-group-messages/ws"
+        return base_url.rstrip("/") + "/api/share/xray-group-messages/ws"
 
     def _share_base_url(self) -> str:
         raw_share_url = str(self.config.get("share_base_url", "http://127.0.0.1:9493")).strip()

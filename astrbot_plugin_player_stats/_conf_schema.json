@@ -29,10 +29,16 @@
     "default": "",
     "hint": "填写要接收矿透风险提示的 QQ 群号。插件会优先通过 OneBot/aiocqhttp 直发；高级用法也可以填写完整 unified_msg_origin。"
   },
+  "enable_xray_group_ws": {
+    "description": "Enable WebSocket xray group sending",
+    "type": "bool",
+    "default": true,
+    "hint": "Use WebSocket push first; if disconnected, the plugin falls back to HTTP polling."
+  },
   "timeout_seconds": {
     "description": "请求超时时间（秒）",
     "type": "float",
-    "default": 8.0
+    "default": 8
   },
   "ranking_limit": {
     "description": "排行榜显示人数",

@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"strconv"
@@ -11,6 +12,8 @@ import (
 	"player-stats-backend-go/internal/settings"
 	sharemodel "player-stats-backend-go/internal/share"
 	"player-stats-backend-go/internal/stats"
+
+	"nhooyr.io/websocket"
 )
 
 func (s *Server) createPlayerShareToken(w http.ResponseWriter, r *http.Request) {
@@ -87,6 +90,70 @@ func (s *Server) pendingXrayGroupMessages(w http.ResponseWriter, r *http.Request
 	}
 	response, err := s.shareService.PendingXrayGroupMessages(r.Context(), queryInt(r, "limit", 5))
 	s.writeHTTPErrorResult(w, http.StatusOK, response, err)
+}
+
+func (s *Server) xrayGroupMessagesWS(w http.ResponseWriter, r *http.Request) {
+	apiKey := r.Header.Get(settings.AstrBotAPIKeyHeader)
+	if apiKey == "" {
+		apiKey = r.URL.Query().Get("apiKey")
+	}
+	if !s.authService.MatchesAstrBotKey(r.Context(), apiKey) {
+		writeError(w, http.StatusUnauthorized, "插件密钥无效")
+		return
+	}
+	conn, err := websocket.Accept(w, r, &websocket.AcceptOptions{InsecureSkipVerify: true})
+	if err != nil {
+		s.logger.Warn("xray group websocket accept failed", "error", err)
+		return
+	}
+	defer conn.Close(websocket.StatusNormalClosure, "")
+
+	ctx := r.Context()
+	pending, err := s.shareService.PendingXrayGroupMessages(ctx, 10)
+	if err != nil {
+		s.logger.Warn("load pending xray group messages failed", "error", err)
+		_ = conn.Close(websocket.StatusInternalError, err.Error())
+		return
+	}
+	for _, message := range pending {
+		if !s.writeXrayGroupWSMessage(ctx, conn, message) {
+			return
+		}
+	}
+
+	messages, unsubscribe := s.shareService.SubscribeXrayGroupMessages(20)
+	defer unsubscribe()
+	pingTicker := time.NewTicker(30 * time.Second)
+	defer pingTicker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case message, ok := <-messages:
+			if !ok || !s.writeXrayGroupWSMessage(ctx, conn, message) {
+				return
+			}
+		case <-pingTicker.C:
+			pingCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+			err := conn.Ping(pingCtx)
+			cancel()
+			if err != nil {
+				return
+			}
+		}
+	}
+}
+
+func (s *Server) writeXrayGroupWSMessage(ctx context.Context, conn *websocket.Conn, message sharemodel.XrayGroupMessageResponse) bool {
+	payload, err := json.Marshal(message)
+	if err != nil {
+		s.logger.Warn("marshal xray group websocket message failed", "error", err)
+		return true
+	}
+	writeCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	err = conn.Write(writeCtx, websocket.MessageText, payload)
+	cancel()
+	return err == nil
 }
 
 func (s *Server) markXrayGroupDelivery(w http.ResponseWriter, r *http.Request) {

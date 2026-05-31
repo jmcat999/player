@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"strings"
+	"sync"
 	"time"
 
 	"player-stats-backend-go/internal/apitype"
@@ -25,10 +26,12 @@ type Service struct {
 	settings *settings.Service
 	stats    *stats.Service
 	xray     *importer.XrayAnalysisService
+	mu       sync.Mutex
+	xraySubs map[chan XrayGroupMessageResponse]struct{}
 }
 
 func NewService(db *sql.DB, cfg config.Config, settingsService *settings.Service, statsService *stats.Service, xrayService *importer.XrayAnalysisService) *Service {
-	return &Service{db: db, cfg: cfg, settings: settingsService, stats: statsService, xray: xrayService}
+	return &Service{db: db, cfg: cfg, settings: settingsService, stats: statsService, xray: xrayService, xraySubs: map[chan XrayGroupMessageResponse]struct{}{}}
 }
 
 type ShareTokenResponse struct {
@@ -329,7 +332,7 @@ func (s *Service) SendXrayToGroup(ctx context.Context, request XrayGroupSendRequ
 		return XrayGroupSendResponse{}, err
 	}
 	messageID, _ := result.LastInsertId()
-	return XrayGroupSendResponse{
+	response := XrayGroupSendResponse{
 		MessageID:  messageID,
 		SharePath:  sharePath,
 		Status:     "PENDING",
@@ -340,7 +343,54 @@ func (s *Service) SendXrayToGroup(ctx context.Context, request XrayGroupSendRequ
 		RiskLevel:  snapshot.player.RiskLevel,
 		ExpiresAt:  expiresAt,
 		TTLMinutes: ttl,
-	}, nil
+	}
+	s.broadcastXrayGroupMessage(XrayGroupMessageResponse{
+		ID:                         messageID,
+		SharePath:                  sharePath,
+		ServerID:                   response.ServerID,
+		ServerName:                 response.ServerName,
+		PlayerName:                 response.PlayerName,
+		RiskScore:                  response.RiskScore,
+		RiskLevel:                  response.RiskLevel,
+		MiningSessionRareOreBreaks: snapshot.player.MiningSessionRareOreBreaks,
+		TrackingEvidenceCount:      snapshot.player.TrackingEvidenceCount,
+		PeakRareOreWindowCount:     snapshot.player.PeakRareOreWindowCount,
+		FromTime:                   localDateTimePtr(&snapshot.fromTime),
+		ToTime:                     localDateTimePtr(&snapshot.toTime),
+		ExpiresAt:                  expiresAt,
+		TTLMinutes:                 ttl,
+	})
+	return response, nil
+}
+
+func (s *Service) SubscribeXrayGroupMessages(buffer int) (<-chan XrayGroupMessageResponse, func()) {
+	if buffer < 1 {
+		buffer = 1
+	}
+	ch := make(chan XrayGroupMessageResponse, buffer)
+	s.mu.Lock()
+	s.xraySubs[ch] = struct{}{}
+	s.mu.Unlock()
+	unsubscribe := func() {
+		s.mu.Lock()
+		if _, ok := s.xraySubs[ch]; ok {
+			delete(s.xraySubs, ch)
+			close(ch)
+		}
+		s.mu.Unlock()
+	}
+	return ch, unsubscribe
+}
+
+func (s *Service) broadcastXrayGroupMessage(message XrayGroupMessageResponse) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for ch := range s.xraySubs {
+		select {
+		case ch <- message:
+		default:
+		}
+	}
 }
 
 func (s *Service) XrayDetails(ctx context.Context, token string) (XrayShareDetailsResponse, error) {

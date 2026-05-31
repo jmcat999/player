@@ -102,3 +102,17 @@ xray_group_id = 123456789
 ```
 
 注意 `/绑定游戏id` 和 `Steve` 中间要有空格。绑定成功后再发送 `/我的游戏信息`。
+
+
+## WebSocket group sending
+
+`enable_xray_group_ws = true` is enabled by default. When Vue creates a Send to QQ group task, the plugin receives it through WebSocket first. If WebSocket disconnects or the backend is temporarily unreachable, the plugin automatically falls back to HTTP polling, so already-created tasks are still kept in the backend queue.
+
+If AstrBot runs in Docker, do not set `api_base_url` to `http://127.0.0.1:9493` unless the backend is in the same container. Use the backend service name, host LAN IP, or another address reachable from the AstrBot container, for example:
+
+```text
+http://player-backend:8080
+http://HOST_LAN_IP:9493
+```
+
+Do not append `/api` or a trailing slash to the backend address.

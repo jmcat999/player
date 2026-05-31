@@ -11,4 +11,5 @@ require (
 require (
 	filippo.io/edwards25519 v1.2.0 // indirect
 	github.com/geoffgarside/ber v1.1.0 // indirect
+	nhooyr.io/websocket v1.8.17 // indirect
 )

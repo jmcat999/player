@@ -97,6 +97,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("POST /api/share/xray/send-to-group", s.sendXrayToGroup)
 	s.mux.HandleFunc("GET /api/share/xray/{token}", s.xrayShareDetails)
 	s.mux.HandleFunc("GET /api/share/xray-group-messages/pending", s.pendingXrayGroupMessages)
+	s.mux.HandleFunc("GET /api/share/xray-group-messages/ws", s.xrayGroupMessagesWS)
 	s.mux.HandleFunc("POST /api/share/xray-group-messages/{messageId}/delivery", s.markXrayGroupDelivery)
 	s.mux.HandleFunc("GET /api/share/{token}", s.playerShareDetails)
 }
