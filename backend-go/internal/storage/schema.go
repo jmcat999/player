@@ -67,6 +67,7 @@ var schemaStatements = []string{
 		server_id VARCHAR(64) NOT NULL,
 		server_name VARCHAR(128) NOT NULL,
 		remote_path VARCHAR(1024) NOT NULL,
+		remote_path_hash CHAR(64) NOT NULL,
 		file_name VARCHAR(255) NOT NULL,
 		log_date DATE,
 		file_size BIGINT NOT NULL,
@@ -76,7 +77,7 @@ var schemaStatements = []string{
 		row_count INT NOT NULL,
 		ignored_count INT NOT NULL,
 		PRIMARY KEY (id),
-		UNIQUE KEY uk_imported_server_log_files_source_path (server_id, remote_path(768)),
+		UNIQUE KEY uk_imported_server_log_files_source_path_hash (server_id, remote_path_hash),
 		KEY idx_imported_server_log_files_source_imported (server_id, imported_at),
 		KEY idx_imported_server_log_files_log_date (log_date)
 	) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,

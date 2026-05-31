@@ -2,7 +2,9 @@ package importer
 
 import (
 	"context"
+	"crypto/sha256"
 	"database/sql"
+	"encoding/hex"
 	"errors"
 	"io"
 	"io/fs"
@@ -473,11 +475,11 @@ type importedFileRecord struct {
 }
 
 func (s *Service) findImportFile(ctx context.Context, serverID, remotePath string) (importedFileRecord, bool, error) {
-	return scanImportFile(s.db.QueryRowContext(ctx, importFileSelectQuery()+` where server_id = ? and remote_path = ?`, serverID, remotePath))
+	return scanImportFile(s.db.QueryRowContext(ctx, importFileSelectQuery()+` where server_id = ? and remote_path_hash = ? and remote_path = ?`, serverID, remotePathHash(remotePath), remotePath))
 }
 
 func findImportFileTx(ctx context.Context, tx *sql.Tx, serverID, remotePath string) (importedFileRecord, bool, error) {
-	return scanImportFile(tx.QueryRowContext(ctx, importFileSelectQuery()+` where server_id = ? and remote_path = ? for update`, serverID, remotePath))
+	return scanImportFile(tx.QueryRowContext(ctx, importFileSelectQuery()+` where server_id = ? and remote_path_hash = ? and remote_path = ? for update`, serverID, remotePathHash(remotePath), remotePath))
 }
 
 func scanImportFile(row *sql.Row) (importedFileRecord, bool, error) {
@@ -500,24 +502,30 @@ func importFileSelectQuery() string {
 
 func upsertImportFile(ctx context.Context, tx *sql.Tx, existingID int64, source config.Source, file RemoteLogFile, logDate *time.Time, parsed parsedLogFile) (int64, error) {
 	importedAt := time.Now().UTC()
+	pathHash := remotePathHash(file.Path)
 	if existingID > 0 {
 		_, err := tx.ExecContext(ctx, `
 			update imported_server_log_files
-			set server_id = ?, server_name = ?, remote_path = ?, file_name = ?, log_date = ?,
+			set server_id = ?, server_name = ?, remote_path = ?, remote_path_hash = ?, file_name = ?, log_date = ?,
 			    file_size = ?, last_modified = ?, content_hash = ?, imported_at = ?, row_count = ?, ignored_count = ?
 			where id = ?
-		`, source.ID, source.Name, file.Path, file.FileName, nullableDate(logDate), file.Size, file.LastModified, parsed.contentHash, importedAt, parsed.rowCount, parsed.ignoredCount, existingID)
+		`, source.ID, source.Name, file.Path, pathHash, file.FileName, nullableDate(logDate), file.Size, file.LastModified, parsed.contentHash, importedAt, parsed.rowCount, parsed.ignoredCount, existingID)
 		return existingID, err
 	}
 	result, err := tx.ExecContext(ctx, `
 		insert into imported_server_log_files
-		    (server_id, server_name, remote_path, file_name, log_date, file_size, last_modified, content_hash, imported_at, row_count, ignored_count)
-		values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-	`, source.ID, source.Name, file.Path, file.FileName, nullableDate(logDate), file.Size, file.LastModified, parsed.contentHash, importedAt, parsed.rowCount, parsed.ignoredCount)
+		    (server_id, server_name, remote_path, remote_path_hash, file_name, log_date, file_size, last_modified, content_hash, imported_at, row_count, ignored_count)
+		values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	`, source.ID, source.Name, file.Path, pathHash, file.FileName, nullableDate(logDate), file.Size, file.LastModified, parsed.contentHash, importedAt, parsed.rowCount, parsed.ignoredCount)
 	if err != nil {
 		return 0, err
 	}
 	return result.LastInsertId()
+}
+
+func remotePathHash(remotePath string) string {
+	sum := sha256.Sum256([]byte(remotePath))
+	return hex.EncodeToString(sum[:])
 }
 
 func loadFileStats(ctx context.Context, tx *sql.Tx, importFileID int64) (map[statKey]actionCounts, error) {
