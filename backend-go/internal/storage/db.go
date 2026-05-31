@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	_ "github.com/go-sql-driver/mysql"
+	"github.com/go-sql-driver/mysql"
 
 	"player-stats-backend-go/internal/config"
 )
@@ -54,19 +54,20 @@ func MySQLDSN(cfg config.Config) (string, error) {
 		dbName = "player_stats"
 	}
 
-	values := url.Values{}
-	values.Set("charset", "utf8mb4,utf8")
-	values.Set("parseTime", "true")
-	values.Set("loc", cfg.ZoneID)
-	values.Set("timeout", "10s")
-	values.Set("readTimeout", "5m")
-	values.Set("writeTimeout", "5m")
+	driverConfig := mysql.NewConfig()
+	driverConfig.User = cfg.DatasourceUsername
+	driverConfig.Passwd = cfg.DatasourcePassword
+	driverConfig.Net = "tcp"
+	driverConfig.Addr = host
+	driverConfig.DBName = dbName
+	driverConfig.ParseTime = true
+	driverConfig.Loc = cfg.Location
+	driverConfig.Timeout = 10 * time.Second
+	driverConfig.ReadTimeout = 5 * time.Minute
+	driverConfig.WriteTimeout = 5 * time.Minute
+	driverConfig.Params = map[string]string{
+		"charset": "utf8mb4",
+	}
 
-	return fmt.Sprintf("%s:%s@tcp(%s)/%s?%s",
-		cfg.DatasourceUsername,
-		cfg.DatasourcePassword,
-		host,
-		dbName,
-		values.Encode(),
-	), nil
+	return driverConfig.FormatDSN(), nil
 }
