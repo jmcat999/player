@@ -6,8 +6,8 @@ docs/
 .idea/
 .vscode/
 docker-data/
-frontend/node_modules/
-frontend/dist/
+frontend-vue/node_modules/
+frontend-vue/dist/
 backend-go/tmp/
 *.log
 *.db

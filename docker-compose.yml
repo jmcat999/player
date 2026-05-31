@@ -1,61 +1,37 @@
 # 玩家日志统计 Docker 部署配置
 #
-# 使用方式：
-#   1. 先修改本文件里标了「建议修改」的密码和密钥
-#   2. 在项目目录执行：docker compose up -d --build
-#   3. 玩家详情公开入口：http://服务器IP:9493
-#   4. 管理后台入口：http://服务器IP:8843
-#   5. AstrBot 插件里的 api_base_url 和 share_base_url 填公开入口：http://服务器IP:9493
-#      不要填 backend，不要填 mysql，不要加 /api。
+# GitHub Actions 会把后端和前端构建成 Docker 镜像并推送到 GHCR。
+# 服务器部署时不需要本地编译，直接执行：
 #
-# 数据保存位置：
-#   数据库文件：./docker-data/mysql
-#   主服 CSV： ./docker-data/synced-logs/main
-#   2服 CSV： ./docker-data/synced-logs/sub
+#   docker compose pull
+#   docker compose up -d
 #
-# 注意：
-#   不要删除 ./docker-data，否则数据库和已经同步的 CSV 都会丢失。
-#   三个服务都配置了 restart: always，服务器重启后会自动启动。
+# 默认入口：
+#   玩家详情 / 分享页 / AstrBot 接口：http://服务器IP:9493
+#   管理后台：http://服务器IP:8843
+#
+# 生产环境请先修改带“建议修改”的密码和密钥。
 
 services:
   mysql:
-    # MySQL 数据库容器，后端会把统计数据写到这里。
     image: mysql:8.4
     container_name: player-stats-mysql
-
-    # 自启动策略：
-    #   服务器重启、Docker 重启、容器异常退出后自动启动。
-    #   如果你手动 docker compose down，它不会强行重新启动。
     restart: always
     environment:
-      # 容器时区，保持中国时间。
       TZ: Asia/Shanghai
-
-      # 数据库名，一般不用改。
       MYSQL_DATABASE: player_stats
-
-      # 数据库普通用户名，一般不用改。
       MYSQL_USER: player_stats
-
-      # 建议修改：数据库普通用户密码。
-      # 注意：如果 docker-data/mysql 已经初始化过，再改这里不会自动修改旧数据库密码。
+      # 建议修改：数据库普通用户密码。已有 docker-data/mysql 时，改这里不会自动改旧库密码。
       MYSQL_PASSWORD: mysql123ll
-
-      # 建议修改：数据库 root 密码。
+      # 建议修改：数据库 root 密码。已有 docker-data/mysql 时，改这里不会自动改旧库密码。
       MYSQL_ROOT_PASSWORD: mysql123ll
     command:
-      # MySQL 使用 utf8mb4，避免中文、特殊字符乱码。
       - --character-set-server=utf8mb4
       - --collation-server=utf8mb4_unicode_ci
-
-      # MySQL 默认时区，+08:00 是中国时区。
       - --default-time-zone=+08:00
     volumes:
-      # 把 MySQL 数据保存到项目目录，重启或重建容器不会丢数据。
       - ./docker-data/mysql:/var/lib/mysql
     healthcheck:
-      # 检查 MySQL 是否已经启动完成。
-      # $${MYSQL_ROOT_PASSWORD} 是读取容器里的 MYSQL_ROOT_PASSWORD，不需要改。
       test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p$${MYSQL_ROOT_PASSWORD} --silent"]
       interval: 10s
       timeout: 5s
@@ -63,162 +39,71 @@ services:
       start_period: 30s
 
   backend:
-    # Go 后端容器，负责登录、CSV 复制、CSV 解析、统计接口、AstrBot 接口。
-    build:
-      context: ./backend-go
-    image: player-stats-backend:local
+    image: ghcr.io/jmcat999/player-backend:latest
     container_name: player-stats-backend
-
-    # 自启动策略，含义同 mysql 服务。
     restart: always
     depends_on:
       mysql:
-        # 等 MySQL 真正可用以后再启动后端。
         condition: service_healthy
     environment:
-      # 容器时区，保持中国时间。
       TZ: Asia/Shanghai
-
-      # 后端容器内部端口，一般不用改。
       SERVER_PORT: 8080
 
-      # 后端连接 MySQL 的地址。
-      # mysql 是上面数据库服务的名字，不是服务器 IP，不要改成 localhost。
       PLAYER_STATS_DATASOURCE_URL: jdbc:mysql://mysql:3306/player_stats?useUnicode=true&characterEncoding=utf8&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Shanghai&rewriteBatchedStatements=true&createDatabaseIfNotExist=true
-
-      # 必须和 mysql 服务里的 MYSQL_USER 保持一致。
       PLAYER_STATS_DATASOURCE_USERNAME: player_stats
-
       # 必须和 mysql 服务里的 MYSQL_PASSWORD 保持一致。
       PLAYER_STATS_DATASOURCE_PASSWORD: mysql123ll
 
-      # 后台管理员账号。
       APP_ADMIN_USERNAME: admin
-
-      # 建议修改：后台管理员初始密码。
-      # 注意：管理员账号已经创建后，再改这里不会覆盖旧密码；后续请在前端个人页面改密码。
+      # 建议修改：后台管理员初始密码。账号已创建后，改这里不会覆盖旧密码。
       APP_ADMIN_PASSWORD: admin123456
-
-      # 建议修改：登录 token 签名密钥。
-      # 随便生成一段长字符串即可，例如 32 位以上。
+      # 建议修改：登录 token 签名密钥，换成一段随机长字符串。
       APP_ADMIN_JWT_SECRET: change-me-to-a-long-random-secret
-
-      # 登录有效期，单位：天。
       APP_ADMIN_TOKEN_TTL_DAYS: 7
 
-      # 日志日期使用的时区。
       PLAYER_LOGS_ZONE_ID: Asia/Shanghai
-
-      # 首次初始化自动任务时是否默认开启。
-      # 后续请在管理后台「系统设置 -> 自动任务」里分别调整主服/2服的复制和解析时间。
       PLAYER_LOGS_IMPORTER_AUTO_RUN: true
-
-      # 兼容旧配置的默认时间；新版本主要使用管理后台里的独立时间设置。
       PLAYER_LOGS_IMPORTER_CRON: 0 30 0 * * *
-
-      # 是否跳过今天的 CSV。
-      # 建议保持 true，避免复制或解析正在写入的当天日志。
       PLAYER_LOGS_IMPORTER_SKIP_TODAY: true
-
-      # 每次最多解析多少个 CSV，文件很多时防止一次跑太久。
       PLAYER_LOGS_IMPORTER_MAX_FILES_PER_RUN: 1000
-
-      # 容器内部 CSV 总目录，一般不用改。
       PLAYER_LOGS_ARCHIVE_DIRECTORY: /data/synced-logs
 
-      # 主服 CSV 来源类型。
-      # LOCAL 表示从本机目录读取，也就是 ./docker-data/synced-logs/main。
       PLAYER_LOGS_MAIN_TYPE: LOCAL
-
-      # 主服 CSV 在容器里的目录，对应宿主机 ./docker-data/synced-logs/main。
       PLAYER_LOGS_MAIN_DIRECTORY: /data/synced-logs/main
-
-      # 主服 CSV 文件名匹配规则。
       PLAYER_LOGS_MAIN_FILE_GLOB: player_actions_*.csv
-
-      # 主服是否递归扫描子目录。
       PLAYER_LOGS_MAIN_RECURSIVE: false
-
-      # 是否启用主服。
       PLAYER_LOGS_MAIN_ENABLED: true
 
-      # 2服 CSV 来源类型。
-      # LOCAL 表示从本机目录读取，也就是 ./docker-data/synced-logs/sub。
       PLAYER_LOGS_SUB_TYPE: LOCAL
-
-      # 2服 CSV 在容器里的目录，对应宿主机 ./docker-data/synced-logs/sub。
       PLAYER_LOGS_SUB_DIRECTORY: /data/synced-logs/sub
-
-      # 2服 CSV 文件名匹配规则。
       PLAYER_LOGS_SUB_FILE_GLOB: player_actions_*.csv
-
-      # 2服是否递归扫描子目录。
       PLAYER_LOGS_SUB_RECURSIVE: false
-
-      # 是否启用 2服。
       PLAYER_LOGS_SUB_ENABLED: true
 
-      # 本地 CSV 总目录，一般不用改。
       PLAYER_LOGS_LOCAL_DIRECTORY: /data/synced-logs
 
-      # 是否启用 SMB 远程复制。
-      # false：不从远程共享复制，只解析 docker-data/synced-logs 里的本地 CSV。
-      # true：启用 SMB，配好下面的远程服务器信息后，可以从远程共享复制 CSV。
+      # SMB 远程复制。默认关闭，只解析 ./docker-data/synced-logs 里的本地 CSV。
       PLAYER_LOGS_SMB_ENABLED: false
-
-      # SMB 服务器 IP 或域名，例如 192.168.1.10。
       PLAYER_LOGS_SMB_HOST: ""
-
-      # SMB 端口，Windows 文件共享通常是 445。
       PLAYER_LOGS_SMB_PORT: 445
-
-      # SMB 域。没有域就保持空字符串。
       PLAYER_LOGS_SMB_DOMAIN: ""
-
-      # SMB 用户名。
       PLAYER_LOGS_SMB_USERNAME: ""
-
-      # SMB 密码。
       PLAYER_LOGS_SMB_PASSWORD: ""
-
-      # SMB 共享名。
-      # 例如 Windows 共享路径是 \\192.168.1.10\mcshare\logs，
-      # 这里填 mcshare，下面的 PLAYER_LOGS_SMB_DIRECTORY 填 logs。
       PLAYER_LOGS_SMB_SHARE: ""
-
-      # SMB 共享里的日志目录。
       PLAYER_LOGS_SMB_DIRECTORY: logs
-
-      # SMB 远程 CSV 文件名匹配规则。
       PLAYER_LOGS_SMB_FILE_GLOB: player_actions_*.csv
-
-      # SMB 是否递归扫描子目录。
       PLAYER_LOGS_SMB_RECURSIVE: false
     volumes:
-      # 把 CSV 目录保存到项目目录。
-      # 宿主机 ./docker-data/synced-logs 会映射成容器里的 /data/synced-logs。
       - ./docker-data/synced-logs:/data/synced-logs
     expose:
-      # 只暴露给 Docker 内部网络，外部用户通过 frontend 访问。
       - "8080"
 
   frontend:
-    # Vue 前端容器，nginx 会提供页面，并把 /api 转发给 backend。
-    build:
-      context: ./frontend
-    image: player-stats-frontend:local
+    image: ghcr.io/jmcat999/player-frontend:latest
     container_name: player-stats-frontend
-
-    # 自启动策略，含义同 mysql 服务。
     restart: always
     depends_on:
       - backend
     ports:
-      # 公开入口：只开放玩家详情页、分享接口和 AstrBot 插件必要查询接口。
-      # "9493:80" 的意思是：服务器 9493 端口 -> 前端容器 80 端口。
-      # 所以分享链接访问 http://服务器IP:9493/share/xxxx，AstrBot 也填 http://服务器IP:9493。
-      # 如果 9493 被占用，可以改成 "9000:80"，然后公开访问 http://服务器IP:9000。
       - "9493:80"
-      # 管理入口：默认开放 8843，部署到公网服务器时建议用防火墙、VPN 或内网反代限制访问。
-      # 如果你只想允许服务器本机访问，可以改成 "127.0.0.1:8843:8081"。
       - "8843:8081"

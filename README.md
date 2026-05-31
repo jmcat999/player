@@ -2,20 +2,24 @@
 
 基岩版 Minecraft 玩家日志统计工具。项目读取 `PlayerLogger.js` 生成的 CSV，支持本地目录或 SMB 远程复制，导入 MySQL 后提供玩家统计、矿物统计、日志查询、矿透分析、分享页面和 AstrBot 插件接口。
 
-当前 Docker 默认使用 Go 后端：`backend-go`。
+当前后端是 Go：`backend-go`。前端目录是 Vue 3：`frontend-vue`。
 
-## 快速启动
+## Docker 部署
 
-要求：
+GitHub Actions 会在 `main` 分支推送后构建并推送两个 Docker 镜像：
 
-- Docker / Docker Compose
-- 可选：Go 1.25+ 用于本地后端开发
-- 可选：Node.js 20+ 用于本地前端开发
+```text
+ghcr.io/jmcat999/player-backend:latest
+ghcr.io/jmcat999/player-frontend:latest
+```
 
-一键启动：
+服务器只需要 Docker / Docker Compose：
 
-```powershell
-docker compose up -d --build
+```bash
+git clone https://github.com/jmcat999/player.git
+cd player
+docker compose pull
+docker compose up -d
 ```
 
 默认入口：
@@ -32,7 +36,27 @@ docker compose up -d --build
 密码：admin123456
 ```
 
-生产环境请修改 `docker-compose.yml` 里的 `APP_ADMIN_PASSWORD`、`APP_ADMIN_JWT_SECRET`、MySQL 密码和对外端口。
+生产环境请先修改 `docker-compose.yml` 里的 `APP_ADMIN_PASSWORD`、`APP_ADMIN_JWT_SECRET`、MySQL 密码和对外端口。账号创建后，再改 `APP_ADMIN_PASSWORD` 不会覆盖旧密码，后续请在管理后台改密码。
+
+如果 `docker compose pull` 提示没有权限，说明 GHCR 镜像包还不是公开的。可以在 GitHub 仓库的 Packages 里把两个镜像设为 Public，或者在服务器执行：
+
+```bash
+echo YOUR_GITHUB_TOKEN | docker login ghcr.io -u jmcat999 --password-stdin
+```
+
+这个 token 至少需要 `read:packages` 权限。
+
+## 更新部署
+
+以后更新代码后，服务器执行：
+
+```bash
+git pull
+docker compose pull
+docker compose up -d
+```
+
+`docker-data/` 是持久化数据目录，不要删除。
 
 ## CSV 目录
 
@@ -57,6 +81,7 @@ player_actions_2026-05-02.csv
 后台“系统设置”里可以配置 SMB，也可以直接修改环境变量：
 
 ```yaml
+PLAYER_LOGS_SMB_ENABLED: true
 PLAYER_LOGS_SMB_HOST: "192.168.1.10"
 PLAYER_LOGS_SMB_PORT: 445
 PLAYER_LOGS_SMB_DOMAIN: ""
@@ -81,10 +106,10 @@ go vet ./...
 go run ./cmd/player-stats
 ```
 
-前端：
+Vue 前端：
 
 ```powershell
-cd frontend
+cd frontend-vue
 npm install
 npm run dev
 ```
@@ -95,7 +120,7 @@ npm run dev
 cd backend-go
 go build -trimpath ./cmd/player-stats
 
-cd ../frontend
+cd ../frontend-vue
 npm run build
 ```
 
@@ -106,7 +131,7 @@ npm run build
 - 拐弯追矿：直线通道至少 8 格，转向角度大于 85 度，拐弯后 2-5 格内命中钻石或远古残骸，路径贴合度至少 95%。
 - 矿脉直达：两个矿脉间距至少 8 格，时间 10-120 秒，中间普通方块不超过 6 个，并去重已使用矿脉。
 - 绿宝石仍计入数量统计，但不作为追矿证据。
-- 只有短直线弱证据时会严格限分，避免高效正常玩家误判。
+- 只有短直线弱证据时严格限分，避免高效正常玩家误判。
 - 下界远古残骸包含床炸场景的单独保守证据。
 
 分析结果默认只保留最近 1 次。
@@ -138,9 +163,9 @@ api_key: 管理后台“系统设置”里的 AstrBot 插件密钥
 
 ```text
 backend-go/                  Go 后端
-frontend/                    Vue 3 前端
+frontend-vue/                Vue 3 前端
 astrbot_plugin_player_stats/ AstrBot 插件
-docs/                        说明文档
 PlayerLogger.js              基岩版日志插件脚本
-docker-compose.yml           一键部署配置
+docker-compose.yml           拉取 GHCR 镜像部署
+.github/workflows/build.yml  GitHub Actions 构建和推送镜像
 ```
