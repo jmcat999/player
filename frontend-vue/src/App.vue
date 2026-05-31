@@ -1207,6 +1207,18 @@ function scrollLogQueryToTop() {
   window.scrollTo({ top: 0, behavior: 'smooth' })
 }
 
+function scrollToElementById(id) {
+  document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+}
+
+function scrollToXrayShareOrePositions() {
+  scrollToElementById('xray-share-rare-ore-positions')
+}
+
+function scrollToXrayDetailOrePositions() {
+  scrollToElementById('xray-detail-rare-ore-positions')
+}
+
 function xrayAnalysisRequestBody(serverId) {
   const form = xrayAnalysisForms.value[serverId] || defaultXrayAnalysisForm()
   const fromDate = form.fromDate || (form.fromTime || '').slice(0, 10)
@@ -2416,14 +2428,12 @@ function toggleAllImportFileSelection(checked) {
                 <span>地下稀有矿占比</span>
                 <strong>{{ xrayRareRatioText(xraySharePlayer) }}</strong>
               </div>
-              <div>
-                <span>稀有矿脉</span>
-                <strong>{{ formatNumber(xraySharePlayer.miningSessionRareVeins || 0) }}</strong>
-              </div>
-              <div>
-                <span>十分钟矿脉峰值</span>
-                <strong>{{ formatNumber(xraySharePlayer.peakRareVeinWindowCount || 0) }}</strong>
-              </div>
+            </div>
+          </section>
+
+          <section class="xray-detail-section xray-toggle-section">
+            <h4>最可疑挖矿会话概况</h4>
+            <div class="xray-detail-grid">
               <div>
                 <span>稀有矿</span>
                 <strong>{{ formatNumber(xraySharePlayer.miningSessionRareOreBreaks) }}</strong>
@@ -2480,10 +2490,6 @@ function toggleAllImportFileSelection(checked) {
               <div>
                 <span>地下稀有矿占比</span>
                 <strong>{{ xrayAnalysisRareRatioText(xraySharePlayer) }}</strong>
-              </div>
-              <div>
-                <span>稀有矿脉</span>
-                <strong>{{ formatNumber(xrayAnalysisValue(xraySharePlayer, 'analysisRareVeins', 'miningSessionRareVeins')) }}</strong>
               </div>
               <div>
                 <span>十分钟挖取峰值</span>
@@ -2548,7 +2554,7 @@ function toggleAllImportFileSelection(checked) {
             <p v-else-if="!xraySharePlayer.evidence?.length" class="settings-hint">没有追矿证据。</p>
           </section>
 
-          <section class="xray-detail-section">
+          <section id="xray-share-rare-ore-positions" class="xray-detail-section">
             <h4>稀有矿位置</h4>
             <div class="xray-expand-row">
               <button
@@ -2617,22 +2623,15 @@ function toggleAllImportFileSelection(checked) {
                   <button class="icon-button" type="button" title="下一页" :disabled="xrayShareOrePositionPage >= xrayShareOrePositionTotalPages" @click="setXrayShareOrePositionPage(xrayShareOrePositionPage + 1)">
                     <ChevronRight :size="18" />
                   </button>
-                  <button class="secondary-button" type="button" @click="scrollLogQueryToTop">
+                  <button class="secondary-button" type="button" @click="scrollToXrayShareOrePositions">
                     <ArrowUp :size="18" />
-                    <span>返回顶部</span>
+                    <span>返回稀有矿位置</span>
                   </button>
                 </div>
               </div>
             </div>
             <p v-else-if="!xraySharePlayer.rareOreRows?.length" class="settings-hint">没有稀有矿位置记录。</p>
           </section>
-
-          <div class="xray-detail-actions">
-            <button class="secondary-button" type="button" @click="scrollLogQueryToTop">
-              <ArrowUp :size="18" />
-              <span>返回顶部</span>
-            </button>
-          </div>
         </div>
       </article>
     </template>
@@ -3802,14 +3801,12 @@ function toggleAllImportFileSelection(checked) {
                   <span>地下稀有矿占比</span>
                   <strong>{{ xrayRareRatioText(selectedXrayDetailPlayer) }}</strong>
                 </div>
-                <div>
-                  <span>稀有矿脉</span>
-                  <strong>{{ formatNumber(selectedXrayDetailPlayer.miningSessionRareVeins || 0) }}</strong>
-                </div>
-                <div>
-                  <span>十分钟矿脉峰值</span>
-                  <strong>{{ formatNumber(selectedXrayDetailPlayer.peakRareVeinWindowCount || 0) }}</strong>
-                </div>
+              </div>
+            </section>
+
+            <section class="xray-detail-section xray-toggle-section">
+              <h4>最可疑挖矿会话概况</h4>
+              <div class="xray-detail-grid">
                 <div>
                   <span>稀有矿</span>
                   <strong>{{ formatNumber(selectedXrayDetailPlayer.miningSessionRareOreBreaks) }}</strong>
@@ -3866,10 +3863,6 @@ function toggleAllImportFileSelection(checked) {
                 <div>
                   <span>地下稀有矿占比</span>
                   <strong>{{ xrayAnalysisRareRatioText(selectedXrayDetailPlayer) }}</strong>
-                </div>
-                <div>
-                  <span>稀有矿脉</span>
-                  <strong>{{ formatNumber(xrayAnalysisValue(selectedXrayDetailPlayer, 'analysisRareVeins', 'miningSessionRareVeins')) }}</strong>
                 </div>
                 <div>
                   <span>十分钟挖取峰值</span>
@@ -3934,7 +3927,7 @@ function toggleAllImportFileSelection(checked) {
               <p v-else-if="!selectedXrayDetailPlayer.evidence?.length" class="settings-hint">没有追矿证据。</p>
             </section>
 
-            <section class="xray-detail-section">
+            <section id="xray-detail-rare-ore-positions" class="xray-detail-section">
               <h4>稀有矿位置</h4>
               <div class="xray-expand-row">
                 <button
@@ -4003,22 +3996,15 @@ function toggleAllImportFileSelection(checked) {
                     <button class="icon-button" type="button" title="下一页" :disabled="xrayDetailOrePositionPage >= xrayDetailOrePositionTotalPages" @click="setXrayDetailOrePositionPage(xrayDetailOrePositionPage + 1)">
                       <ChevronRight :size="18" />
                     </button>
-                    <button class="secondary-button" type="button" @click="scrollLogQueryToTop">
+                    <button class="secondary-button" type="button" @click="scrollToXrayDetailOrePositions">
                       <ArrowUp :size="18" />
-                      <span>返回顶部</span>
+                      <span>返回稀有矿位置</span>
                     </button>
                   </div>
                 </div>
               </div>
               <p v-else-if="!selectedXrayDetailPlayer.rareOreRows?.length" class="settings-hint">没有稀有矿位置记录。</p>
             </section>
-
-            <div class="xray-detail-actions">
-              <button class="secondary-button" type="button" @click="scrollLogQueryToTop">
-                <ArrowUp :size="18" />
-                <span>返回顶部</span>
-              </button>
-            </div>
           </div>
         </article>
       </template>
