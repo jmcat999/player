@@ -92,63 +92,111 @@ func (s *Service) SyncFilesFromConfiguredSource(ctx context.Context, requestedSe
 }
 
 func (s *Service) DeleteImportRecord(ctx context.Context, serverID, remotePath string) (DeleteImportRecordResult, error) {
-	serverID = strings.TrimSpace(serverID)
-	remotePath = strings.TrimSpace(remotePath)
-	if serverID == "" || remotePath == "" {
-		return DeleteImportRecordResult{}, auth.NewHTTPError(400, "serverId and remotePath are required")
-	}
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return DeleteImportRecordResult{}, err
 	}
 	defer rollbackQuietly(tx)
 
-	record, found, err := findImportFileTx(ctx, tx, serverID, remotePath)
+	deleted, err := s.deleteImportRecordTx(ctx, tx, serverID, remotePath)
 	if err != nil {
 		return DeleteImportRecordResult{}, err
 	}
-	if !found {
-		return DeleteImportRecordResult{}, auth.NewHTTPError(404, "Import record not found")
-	}
-	previous, err := loadFileStats(ctx, tx, record.id)
-	if err != nil {
-		return DeleteImportRecordResult{}, err
-	}
-	affectedPlayers, err := loadFileSeenPlayers(ctx, tx, record.id)
-	if err != nil {
-		return DeleteImportRecordResult{}, err
-	}
-	if err := subtractDeltas(ctx, tx, record.serverID, record.serverName, previous); err != nil {
-		return DeleteImportRecordResult{}, err
-	}
-	if err := deleteFileDetails(ctx, tx, record.id); err != nil {
-		return DeleteImportRecordResult{}, err
-	}
-	if _, err := tx.ExecContext(ctx, `delete from imported_server_log_files where id = ?`, record.id); err != nil {
-		return DeleteImportRecordResult{}, err
-	}
-	if err := s.syncProfiles(ctx, tx, record.serverID, record.serverName, affectedPlayers); err != nil {
+	if err := s.syncProfiles(ctx, tx, deleted.serverID, deleted.serverName, deleted.affectedPlayers); err != nil {
 		return DeleteImportRecordResult{}, err
 	}
 	if err := tx.Commit(); err != nil {
 		return DeleteImportRecordResult{}, err
 	}
-	return DeleteImportRecordResult{ServerID: serverID, RemotePath: remotePath, Deleted: true, Message: "Import record deleted"}, nil
+	return deleted.result, nil
 }
 
 func (s *Service) DeleteImportRecords(ctx context.Context, request DeleteImportRecordsRequest) []DeleteImportRecordResult {
 	if len(request.Files) == 0 {
 		return []DeleteImportRecordResult{{Deleted: false, Message: "files are required"}}
 	}
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return []DeleteImportRecordResult{{Deleted: false, Message: err.Error()}}
+	}
+	defer rollbackQuietly(tx)
+
 	results := make([]DeleteImportRecordResult, 0, len(request.Files))
+	profiles := map[profileSyncKey]map[string]struct{}{}
 	for _, file := range request.Files {
-		result, err := s.DeleteImportRecord(ctx, file.ServerID, file.RemotePath)
+		deleted, err := s.deleteImportRecordTx(ctx, tx, file.ServerID, file.RemotePath)
 		if err != nil {
-			result = DeleteImportRecordResult{ServerID: file.ServerID, RemotePath: file.RemotePath, Deleted: false, Message: err.Error()}
+			results = append(results, DeleteImportRecordResult{ServerID: file.ServerID, RemotePath: file.RemotePath, Deleted: false, Message: err.Error()})
+			continue
 		}
-		results = append(results, result)
+		results = append(results, deleted.result)
+		key := profileSyncKey{serverID: deleted.serverID, serverName: deleted.serverName}
+		if profiles[key] == nil {
+			profiles[key] = map[string]struct{}{}
+		}
+		for playerName := range deleted.affectedPlayers {
+			profiles[key][playerName] = struct{}{}
+		}
+	}
+	for key, playerNames := range profiles {
+		if err := s.syncProfiles(ctx, tx, key.serverID, key.serverName, playerNames); err != nil {
+			return append(results, DeleteImportRecordResult{Deleted: false, Message: err.Error()})
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		return append(results, DeleteImportRecordResult{Deleted: false, Message: err.Error()})
 	}
 	return results
+}
+
+type deletedImportRecord struct {
+	result          DeleteImportRecordResult
+	serverID        string
+	serverName      string
+	affectedPlayers map[string]struct{}
+}
+
+type profileSyncKey struct {
+	serverID   string
+	serverName string
+}
+
+func (s *Service) deleteImportRecordTx(ctx context.Context, tx *sql.Tx, serverID, remotePath string) (deletedImportRecord, error) {
+	serverID = strings.TrimSpace(serverID)
+	remotePath = strings.TrimSpace(remotePath)
+	if serverID == "" || remotePath == "" {
+		return deletedImportRecord{}, auth.NewHTTPError(400, "serverId and remotePath are required")
+	}
+	record, found, err := findImportFileTx(ctx, tx, serverID, remotePath)
+	if err != nil {
+		return deletedImportRecord{}, err
+	}
+	if !found {
+		return deletedImportRecord{}, auth.NewHTTPError(404, "Import record not found")
+	}
+	previous, err := loadFileStats(ctx, tx, record.id)
+	if err != nil {
+		return deletedImportRecord{}, err
+	}
+	affectedPlayers, err := loadFileSeenPlayers(ctx, tx, record.id)
+	if err != nil {
+		return deletedImportRecord{}, err
+	}
+	if err := subtractDeltas(ctx, tx, record.serverID, record.serverName, previous); err != nil {
+		return deletedImportRecord{}, err
+	}
+	if err := deleteFileDetails(ctx, tx, record.id); err != nil {
+		return deletedImportRecord{}, err
+	}
+	if _, err := tx.ExecContext(ctx, `delete from imported_server_log_files where id = ?`, record.id); err != nil {
+		return deletedImportRecord{}, err
+	}
+	return deletedImportRecord{
+		result:          DeleteImportRecordResult{ServerID: serverID, RemotePath: remotePath, Deleted: true, Message: "Import record deleted"},
+		serverID:        record.serverID,
+		serverName:      record.serverName,
+		affectedPlayers: affectedPlayers,
+	}, nil
 }
 
 func (s *Service) DeleteLocalFile(ctx context.Context, serverID, remotePath string) (DeleteImportRecordResult, error) {
