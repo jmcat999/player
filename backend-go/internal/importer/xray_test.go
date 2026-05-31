@@ -54,6 +54,15 @@ func TestCollectMetricsCountsDiamondAndAncientDebrisLikeJava(t *testing.T) {
 	if got := metrics.rareOreCounts["ANCIENT_DEBRIS"]; got != 1 {
 		t.Fatalf("rareOreCounts[ANCIENT_DEBRIS] = %d, want 1", got)
 	}
+	if len(metrics.rareRows) != int(metrics.rareOreBreaks) {
+		t.Fatalf("rareRows len = %d, rareOreBreaks = %d", len(metrics.rareRows), metrics.rareOreBreaks)
+	}
+	if metrics.peakRareOreCount != 3 {
+		t.Fatalf("peakRareOreCount = %d, want 3", metrics.peakRareOreCount)
+	}
+	if metrics.suspiciousPeakRareOreCount != 1 {
+		t.Fatalf("suspiciousPeakRareOreCount = %d, want 1", metrics.suspiciousPeakRareOreCount)
+	}
 }
 
 func TestRecentTunnelEventsStopsAtInterruptedPath(t *testing.T) {

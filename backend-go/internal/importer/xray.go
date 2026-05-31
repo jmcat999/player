@@ -575,25 +575,28 @@ func analyzePlayer(playerName string, events []xrayEvent) XrayPlayerRiskView {
 }
 
 type playerMetrics struct {
-	start                   *time.Time
-	end                     *time.Time
-	breaks                  int64
-	undergroundBreaks       int64
-	oreBreaks               int64
-	rareOreBreaks           int64
-	suspiciousRareOreBreaks int64
-	diamondOreBreaks        int64
-	ancientDebrisBreaks     int64
-	rareRatio               float64
-	suspiciousRareRatio     float64
-	oreCounts               map[string]int64
-	rareOreCounts           map[string]int64
-	rareRows                []LogQueryRow
-	rareVeins               []rareVein
-	peakRareOreCount        int
-	peakRareOreStart        *time.Time
-	peakRareOreEnd          *time.Time
-	peakRareVeinCount       int
+	start                       *time.Time
+	end                         *time.Time
+	breaks                      int64
+	undergroundBreaks           int64
+	oreBreaks                   int64
+	rareOreBreaks               int64
+	suspiciousRareOreBreaks     int64
+	diamondOreBreaks            int64
+	ancientDebrisBreaks         int64
+	rareRatio                   float64
+	suspiciousRareRatio         float64
+	oreCounts                   map[string]int64
+	rareOreCounts               map[string]int64
+	rareRows                    []LogQueryRow
+	rareVeins                   []rareVein
+	peakRareOreCount            int
+	peakRareOreStart            *time.Time
+	peakRareOreEnd              *time.Time
+	peakRareVeinCount           int
+	suspiciousRareVeins         []rareVein
+	suspiciousPeakRareOreCount  int
+	suspiciousPeakRareVeinCount int
 }
 
 type rareVein struct {
@@ -608,6 +611,7 @@ func collectMetrics(events []xrayEvent) playerMetrics {
 	start, end := events[0].happenedAt, events[len(events)-1].happenedAt
 	metrics.start, metrics.end = &start, &end
 	var rareEvents []xrayEvent
+	var suspiciousRareEvents []xrayEvent
 	for _, event := range events {
 		metrics.breaks++
 		if event.hasPoint && event.point.y <= 32 {
@@ -619,6 +623,10 @@ func collectMetrics(events []xrayEvent) playerMetrics {
 			if catalog.IsRareOre(event.oreType) {
 				metrics.rareOreBreaks++
 				metrics.rareOreCounts[event.oreType]++
+				metrics.rareRows = append(metrics.rareRows, event.row)
+				if event.hasPoint {
+					rareEvents = append(rareEvents, event)
+				}
 			}
 			if catalog.IsDiamond(event.oreType) {
 				metrics.diamondOreBreaks++
@@ -629,8 +637,7 @@ func collectMetrics(events []xrayEvent) playerMetrics {
 		}
 		if event.rareOre {
 			metrics.suspiciousRareOreBreaks++
-			metrics.rareRows = append(metrics.rareRows, event.row)
-			rareEvents = append(rareEvents, event)
+			suspiciousRareEvents = append(suspiciousRareEvents, event)
 		}
 	}
 	if metrics.undergroundBreaks > 0 {
@@ -640,6 +647,9 @@ func collectMetrics(events []xrayEvent) playerMetrics {
 	metrics.rareVeins = buildRareVeins(rareEvents)
 	metrics.peakRareOreCount, metrics.peakRareOreStart, metrics.peakRareOreEnd = peakRareOreWindow(rareEvents)
 	metrics.peakRareVeinCount = peakRareVeinWindow(metrics.rareVeins)
+	metrics.suspiciousRareVeins = buildRareVeins(suspiciousRareEvents)
+	metrics.suspiciousPeakRareOreCount, _, _ = peakRareOreWindow(suspiciousRareEvents)
+	metrics.suspiciousPeakRareVeinCount = peakRareVeinWindow(metrics.suspiciousRareVeins)
 	return metrics
 }
 
@@ -913,10 +923,10 @@ func detectBedBlastEvidence(events []xrayEvent, metrics playerMetrics) []XrayEvi
 func rawRiskScore(metrics playerMetrics, strongEvidenceCount int, weakQualified bool, bedEvidence bool) int {
 	score := 0.0
 	score += math.Min(16, float64(metrics.suspiciousRareOreBreaks)*16.0/50.0)
-	score += math.Min(16, float64(metrics.peakRareOreCount)*16.0/35.0)
+	score += math.Min(16, float64(metrics.suspiciousPeakRareOreCount)*16.0/35.0)
 	score += math.Min(16, metrics.suspiciousRareRatio*16.0/0.03)
-	score += math.Min(12, float64(metrics.peakRareVeinCount)*12.0/35.0)
-	score += math.Min(12, float64(len(metrics.rareVeins))*12.0/80.0)
+	score += math.Min(12, float64(metrics.suspiciousPeakRareVeinCount)*12.0/35.0)
+	score += math.Min(12, float64(len(metrics.suspiciousRareVeins))*12.0/80.0)
 	if strongEvidenceCount >= 3 {
 		score += math.Min(40, float64(strongEvidenceCount)*12.0)
 	} else {
@@ -953,13 +963,13 @@ func riskReasons(session, analysis playerMetrics, strongEvidenceCount int, weakQ
 	if session.suspiciousRareOreBreaks >= 50 {
 		reasons = append(reasons, "稀有矿数量异常")
 	}
-	if session.peakRareOreCount >= 35 {
+	if session.suspiciousPeakRareOreCount >= 35 {
 		reasons = append(reasons, "10 分钟稀有矿峰值异常")
 	}
 	if session.suspiciousRareRatio >= 0.03 {
 		reasons = append(reasons, "地下稀有矿占比异常")
 	}
-	if session.peakRareVeinCount >= 20 {
+	if session.suspiciousPeakRareVeinCount >= 20 {
 		reasons = append(reasons, "矿脉发现速度异常")
 	}
 	if strongEvidenceCount >= 3 {
