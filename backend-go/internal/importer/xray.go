@@ -513,6 +513,7 @@ func analyzePlayer(playerName string, events []xrayEvent) XrayPlayerRiskView {
 	allEvidence := append([]XrayEvidenceView{}, strongEvidence...)
 	allEvidence = append(allEvidence, bedEvidence...)
 	allEvidence = append(allEvidence, weakEvidence...)
+	allEvidence = attachEvidenceContextRows(allEvidence, events, 20)
 
 	sessions := splitMiningSessions(events)
 	bestSessionEvents := events
@@ -1257,6 +1258,74 @@ func weakEvidenceQualified(evidence []XrayEvidenceView) bool {
 		}
 	}
 	return false
+}
+
+func attachEvidenceContextRows(evidence []XrayEvidenceView, events []xrayEvent, contextRows int) []XrayEvidenceView {
+	if len(evidence) == 0 || len(events) == 0 || contextRows < 1 {
+		return evidence
+	}
+	enriched := make([]XrayEvidenceView, len(evidence))
+	for index, item := range evidence {
+		enriched[index] = item
+		start, end := evidenceWindow(item)
+		if start == nil && end == nil {
+			continue
+		}
+		firstAnchor, lastAnchor := evidenceAnchorIndexes(events, start, end)
+		first := max(0, firstAnchor-contextRows)
+		last := min(len(events)-1, lastAnchor+contextRows)
+		contextEvents := events[first : last+1]
+		enriched[index].Rows = rowsFromEvents(contextEvents)
+	}
+	return enriched
+}
+
+func evidenceWindow(evidence XrayEvidenceView) (*time.Time, *time.Time) {
+	var start, end *time.Time
+	if evidence.StartedAt != nil {
+		value := evidence.StartedAt.Time
+		start = &value
+	}
+	if evidence.EndedAt != nil {
+		value := evidence.EndedAt.Time
+		end = &value
+	}
+	return start, end
+}
+
+func evidenceAnchorIndexes(events []xrayEvent, start, end *time.Time) (int, int) {
+	firstTarget := end
+	if start != nil {
+		firstTarget = start
+	}
+	lastTarget := start
+	if end != nil {
+		lastTarget = end
+	}
+	first := nearestEventIndex(events, *firstTarget)
+	last := nearestEventIndex(events, *lastTarget)
+	if last < first {
+		first, last = last, first
+	}
+	return first, last
+}
+
+func nearestEventIndex(events []xrayEvent, target time.Time) int {
+	index := sort.Search(len(events), func(i int) bool {
+		return !events[i].happenedAt.Before(target)
+	})
+	if index <= 0 {
+		return 0
+	}
+	if index >= len(events) {
+		return len(events) - 1
+	}
+	before := target.Sub(events[index-1].happenedAt)
+	after := events[index].happenedAt.Sub(target)
+	if before <= after {
+		return index - 1
+	}
+	return index
 }
 
 func rowsFromEvents(events []xrayEvent) []LogQueryRow {

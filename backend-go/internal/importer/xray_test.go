@@ -95,6 +95,46 @@ func TestRecentTunnelEventsStopsAtInterruptedPath(t *testing.T) {
 	}
 }
 
+func TestAttachEvidenceContextRowsUsesTwentyRowsAroundEvidence(t *testing.T) {
+	base := time.Date(2026, 5, 23, 7, 45, 0, 0, time.UTC)
+	events := make([]xrayEvent, 60)
+	for i := range events {
+		happenedAt := base.Add(time.Duration(i) * time.Second)
+		events[i] = xrayEvent{
+			row: LogQueryRow{
+				LineNumber: int64(i + 1),
+				Date:       happenedAt.Format("2006-01-02"),
+				Time:       happenedAt.Format("15:04:05"),
+				Action:     "破坏方块",
+				Detail1:    "minecraft:deepslate",
+			},
+			happenedAt: happenedAt,
+		}
+	}
+	evidence := []XrayEvidenceView{
+		{
+			StartedAt: localDateTimeValue(base.Add(25 * time.Second)),
+			EndedAt:   localDateTimeValue(base.Add(26 * time.Second)),
+			Summary:   "测试证据",
+			Rows:      []LogQueryRow{{LineNumber: 999}},
+		},
+	}
+
+	enriched := attachEvidenceContextRows(evidence, events, 20)
+	if len(enriched) != 1 {
+		t.Fatalf("enriched len = %d, want 1", len(enriched))
+	}
+	if len(enriched[0].Rows) != 42 {
+		t.Fatalf("context row len = %d, want 42", len(enriched[0].Rows))
+	}
+	if got := enriched[0].Rows[0].LineNumber; got != 6 {
+		t.Fatalf("first context line = %d, want 6", got)
+	}
+	if got := enriched[0].Rows[len(enriched[0].Rows)-1].LineNumber; got != 47 {
+		t.Fatalf("last context line = %d, want 47", got)
+	}
+}
+
 func tunnelEvent(t time.Time, x, y, z float64) xrayEvent {
 	return xrayEvent{
 		row:         LogQueryRow{Dimension2: "overworld"},

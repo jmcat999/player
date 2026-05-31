@@ -1787,6 +1787,19 @@ function rareOreDetailText(row) {
   return detail || '-'
 }
 
+function evidenceRowText(row) {
+  const when = [row?.date, row?.time].filter(Boolean).join(' ')
+  const playerPosition = logQueryCoordinateText(row?.x, row?.y, row?.z, row?.dimension)
+  const targetPosition = logQueryCoordinateText(row?.x2, row?.y2, row?.z2, row?.dimension2)
+  return [
+    when,
+    row?.action && row.action !== '-' ? row.action : '',
+    rareOreDetailText(row),
+    playerPosition !== '-' ? `玩家 ${playerPosition}` : '',
+    targetPosition !== '-' ? `交互 ${targetPosition}` : ''
+  ].filter(Boolean).join(' · ') || '-'
+}
+
 function xrayOreCounts(player) {
   return player?.ores?.length ? player.ores : (player?.rareOres || [])
 }
@@ -2411,6 +2424,33 @@ function toggleAllImportFileSelection(checked) {
                 <span>十分钟矿脉峰值</span>
                 <strong>{{ formatNumber(xraySharePlayer.peakRareVeinWindowCount || 0) }}</strong>
               </div>
+              <div>
+                <span>稀有矿</span>
+                <strong>{{ formatNumber(xraySharePlayer.miningSessionRareOreBreaks) }}</strong>
+              </div>
+              <div>
+                <span>钻石矿</span>
+                <strong>{{ formatNumber(xraySharePlayer.miningSessionDiamondOreBreaks) }}</strong>
+              </div>
+              <div>
+                <span>远古残骸</span>
+                <strong>{{ formatNumber(xraySharePlayer.miningSessionAncientDebrisBreaks) }}</strong>
+              </div>
+              <div>
+                <span>会话追矿证据</span>
+                <strong>{{ formatNumber(xraySharePlayer.trackingEvidenceCount) }}</strong>
+              </div>
+              <div>
+                <span>十分钟挖取峰值</span>
+                <strong>{{ formatNumber(xraySharePlayer.peakRareOreWindowCount || 0) }}</strong>
+              </div>
+              <div>
+                <span>短时窗口</span>
+                <strong v-if="xraySharePlayer.peakRareOreWindowStart && xraySharePlayer.peakRareOreWindowEnd">
+                  {{ formatDateTime(xraySharePlayer.peakRareOreWindowStart) }} - {{ formatDateTime(xraySharePlayer.peakRareOreWindowEnd) }}
+                </strong>
+                <strong v-else>-</strong>
+              </div>
             </div>
           </section>
 
@@ -2452,39 +2492,6 @@ function toggleAllImportFileSelection(checked) {
               <div>
                 <span>周期追矿证据</span>
                 <strong>{{ formatNumber(xrayAnalysisTrackingEvidenceCount(xraySharePlayer)) }}</strong>
-              </div>
-            </div>
-          </section>
-
-          <section class="xray-detail-section xray-toggle-section">
-            <h4>会话风险概况</h4>
-            <div class="xray-detail-grid">
-              <div>
-                <span>稀有矿</span>
-                <strong>{{ formatNumber(xraySharePlayer.miningSessionRareOreBreaks) }}</strong>
-              </div>
-              <div>
-                <span>钻石矿</span>
-                <strong>{{ formatNumber(xraySharePlayer.miningSessionDiamondOreBreaks) }}</strong>
-              </div>
-              <div>
-                <span>远古残骸</span>
-                <strong>{{ formatNumber(xraySharePlayer.miningSessionAncientDebrisBreaks) }}</strong>
-              </div>
-              <div>
-                <span>会话追矿证据</span>
-                <strong>{{ formatNumber(xraySharePlayer.trackingEvidenceCount) }}</strong>
-              </div>
-              <div>
-                <span>十分钟挖取峰值</span>
-                <strong>{{ formatNumber(xraySharePlayer.peakRareOreWindowCount || 0) }}</strong>
-              </div>
-              <div>
-                <span>短时窗口</span>
-                <strong v-if="xraySharePlayer.peakRareOreWindowStart && xraySharePlayer.peakRareOreWindowEnd">
-                  {{ formatDateTime(xraySharePlayer.peakRareOreWindowStart) }} - {{ formatDateTime(xraySharePlayer.peakRareOreWindowEnd) }}
-                </strong>
-                <strong v-else>-</strong>
               </div>
             </div>
           </section>
@@ -2533,7 +2540,7 @@ function toggleAllImportFileSelection(checked) {
                 </button>
                 <div v-if="evidence.rows?.length && isShareXrayEvidenceRowsExpanded(evidence, evidenceIndex)" class="evidence-lines">
                   <span v-for="row in evidence.rows" :key="`${row.filePath}:${row.lineNumber}`">
-                    {{ row.time }} {{ row.detail1 || '-' }} @ {{ logQueryCoordinateText(row.x2, row.y2, row.z2, row.dimension2) }}
+                    {{ evidenceRowText(row) }}
                   </span>
                 </div>
               </div>
@@ -2593,6 +2600,29 @@ function toggleAllImportFileSelection(checked) {
                   </tr>
                 </tbody>
               </table>
+              <div class="table-toolbar bottom-toolbar">
+                <span>
+                  第 {{ clampPage(xrayShareOrePositionPage, xrayShareOrePositionTotalPages) }} / {{ xrayShareOrePositionTotalPages }} 页，本页 {{ formatNumber(xraySharePagedRareOreRows.length) }} 条，共 {{ formatNumber(xrayShareRareOreRows.length) }} 条
+                </span>
+                <div class="pagination-controls">
+                  <label>
+                    <span>每页</span>
+                    <select :value="xrayShareOrePositionPageSize" @change="setXrayShareOrePositionPageSize($event.target.value)">
+                      <option v-for="size in XRAY_ORE_POSITION_PAGE_SIZE_OPTIONS" :key="size" :value="size">{{ size }}</option>
+                    </select>
+                  </label>
+                  <button class="icon-button" type="button" title="上一页" :disabled="xrayShareOrePositionPage <= 1" @click="setXrayShareOrePositionPage(xrayShareOrePositionPage - 1)">
+                    <ChevronLeft :size="18" />
+                  </button>
+                  <button class="icon-button" type="button" title="下一页" :disabled="xrayShareOrePositionPage >= xrayShareOrePositionTotalPages" @click="setXrayShareOrePositionPage(xrayShareOrePositionPage + 1)">
+                    <ChevronRight :size="18" />
+                  </button>
+                  <button class="secondary-button" type="button" @click="scrollLogQueryToTop">
+                    <ArrowUp :size="18" />
+                    <span>返回顶部</span>
+                  </button>
+                </div>
+              </div>
             </div>
             <p v-else-if="!xraySharePlayer.rareOreRows?.length" class="settings-hint">没有稀有矿位置记录。</p>
           </section>
@@ -3780,6 +3810,33 @@ function toggleAllImportFileSelection(checked) {
                   <span>十分钟矿脉峰值</span>
                   <strong>{{ formatNumber(selectedXrayDetailPlayer.peakRareVeinWindowCount || 0) }}</strong>
                 </div>
+                <div>
+                  <span>稀有矿</span>
+                  <strong>{{ formatNumber(selectedXrayDetailPlayer.miningSessionRareOreBreaks) }}</strong>
+                </div>
+                <div>
+                  <span>钻石矿</span>
+                  <strong>{{ formatNumber(selectedXrayDetailPlayer.miningSessionDiamondOreBreaks) }}</strong>
+                </div>
+                <div>
+                  <span>远古残骸</span>
+                  <strong>{{ formatNumber(selectedXrayDetailPlayer.miningSessionAncientDebrisBreaks) }}</strong>
+                </div>
+                <div>
+                  <span>会话追矿证据</span>
+                  <strong>{{ formatNumber(selectedXrayDetailPlayer.trackingEvidenceCount) }}</strong>
+                </div>
+                <div>
+                  <span>十分钟挖取峰值</span>
+                  <strong>{{ formatNumber(selectedXrayDetailPlayer.peakRareOreWindowCount || 0) }}</strong>
+                </div>
+                <div>
+                  <span>短时窗口</span>
+                  <strong v-if="selectedXrayDetailPlayer.peakRareOreWindowStart && selectedXrayDetailPlayer.peakRareOreWindowEnd">
+                    {{ formatDateTime(selectedXrayDetailPlayer.peakRareOreWindowStart) }} - {{ formatDateTime(selectedXrayDetailPlayer.peakRareOreWindowEnd) }}
+                  </strong>
+                  <strong v-else>-</strong>
+                </div>
               </div>
             </section>
 
@@ -3821,39 +3878,6 @@ function toggleAllImportFileSelection(checked) {
                 <div>
                   <span>周期追矿证据</span>
                   <strong>{{ formatNumber(xrayAnalysisTrackingEvidenceCount(selectedXrayDetailPlayer)) }}</strong>
-                </div>
-              </div>
-            </section>
-
-            <section class="xray-detail-section xray-toggle-section">
-              <h4>会话风险概况</h4>
-              <div class="xray-detail-grid">
-                <div>
-                  <span>稀有矿</span>
-                  <strong>{{ formatNumber(selectedXrayDetailPlayer.miningSessionRareOreBreaks) }}</strong>
-                </div>
-                <div>
-                  <span>钻石矿</span>
-                  <strong>{{ formatNumber(selectedXrayDetailPlayer.miningSessionDiamondOreBreaks) }}</strong>
-                </div>
-                <div>
-                  <span>远古残骸</span>
-                  <strong>{{ formatNumber(selectedXrayDetailPlayer.miningSessionAncientDebrisBreaks) }}</strong>
-                </div>
-                <div>
-                  <span>会话追矿证据</span>
-                  <strong>{{ formatNumber(selectedXrayDetailPlayer.trackingEvidenceCount) }}</strong>
-                </div>
-                <div>
-                  <span>十分钟挖取峰值</span>
-                  <strong>{{ formatNumber(selectedXrayDetailPlayer.peakRareOreWindowCount || 0) }}</strong>
-                </div>
-                <div>
-                  <span>短时窗口</span>
-                  <strong v-if="selectedXrayDetailPlayer.peakRareOreWindowStart && selectedXrayDetailPlayer.peakRareOreWindowEnd">
-                    {{ formatDateTime(selectedXrayDetailPlayer.peakRareOreWindowStart) }} - {{ formatDateTime(selectedXrayDetailPlayer.peakRareOreWindowEnd) }}
-                  </strong>
-                  <strong v-else>-</strong>
                 </div>
               </div>
             </section>
@@ -3902,7 +3926,7 @@ function toggleAllImportFileSelection(checked) {
                   </button>
                   <div v-if="evidence.rows?.length && isDetailXrayEvidenceRowsExpanded(evidence, evidenceIndex)" class="evidence-lines">
                     <span v-for="row in evidence.rows" :key="`${row.filePath}:${row.lineNumber}`">
-                      {{ row.time }} {{ row.detail1 || '-' }} @ {{ logQueryCoordinateText(row.x2, row.y2, row.z2, row.dimension2) }}
+                      {{ evidenceRowText(row) }}
                     </span>
                   </div>
                 </div>
@@ -3962,6 +3986,29 @@ function toggleAllImportFileSelection(checked) {
                     </tr>
                   </tbody>
                 </table>
+                <div class="table-toolbar bottom-toolbar">
+                  <span>
+                    第 {{ clampPage(xrayDetailOrePositionPage, xrayDetailOrePositionTotalPages) }} / {{ xrayDetailOrePositionTotalPages }} 页，本页 {{ formatNumber(xrayDetailPagedRareOreRows.length) }} 条，共 {{ formatNumber(xrayDetailRareOreRows.length) }} 条
+                  </span>
+                  <div class="pagination-controls">
+                    <label>
+                      <span>每页</span>
+                      <select :value="xrayDetailOrePositionPageSize" @change="setXrayDetailOrePositionPageSize($event.target.value)">
+                        <option v-for="size in XRAY_ORE_POSITION_PAGE_SIZE_OPTIONS" :key="size" :value="size">{{ size }}</option>
+                      </select>
+                    </label>
+                    <button class="icon-button" type="button" title="上一页" :disabled="xrayDetailOrePositionPage <= 1" @click="setXrayDetailOrePositionPage(xrayDetailOrePositionPage - 1)">
+                      <ChevronLeft :size="18" />
+                    </button>
+                    <button class="icon-button" type="button" title="下一页" :disabled="xrayDetailOrePositionPage >= xrayDetailOrePositionTotalPages" @click="setXrayDetailOrePositionPage(xrayDetailOrePositionPage + 1)">
+                      <ChevronRight :size="18" />
+                    </button>
+                    <button class="secondary-button" type="button" @click="scrollLogQueryToTop">
+                      <ArrowUp :size="18" />
+                      <span>返回顶部</span>
+                    </button>
+                  </div>
+                </div>
               </div>
               <p v-else-if="!selectedXrayDetailPlayer.rareOreRows?.length" class="settings-hint">没有稀有矿位置记录。</p>
             </section>
