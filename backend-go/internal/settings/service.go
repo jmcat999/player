@@ -183,7 +183,7 @@ func (s *Service) Sources(ctx context.Context) ([]SyncSource, error) {
 		return nil, err
 	}
 	defer rows.Close()
-	var result []SyncSource
+	result := make([]SyncSource, 0)
 	for rows.Next() {
 		var source SyncSource
 		var id int64
@@ -249,7 +249,7 @@ func (s *Service) LocalSourceFiles(ctx context.Context, sourceID string) ([]Remo
 		return nil, errors.New("找不到数据源：" + sourceID)
 	}
 	pattern := defaultString(source.FileGlob, "player_actions_*.csv")
-	var files []RemoteLogFile
+	files := make([]RemoteLogFile, 0)
 	err := filepath.WalkDir(source.Directory, func(path string, entry fs.DirEntry, err error) error {
 		if err != nil {
 			return nil

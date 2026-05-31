@@ -1131,7 +1131,7 @@ func parsePoint3(xRaw, yRaw, zRaw string) (point3, bool) {
 }
 
 func recentTunnelEvents(events []xrayEvent, target xrayEvent, seconds int) []xrayEvent {
-	var result []xrayEvent
+	result := make([]xrayEvent, 0)
 	for i := len(events) - 1; i >= 0; i-- {
 		event := events[i]
 		if target.happenedAt.Sub(event.happenedAt) > time.Duration(seconds)*time.Second {
@@ -1226,7 +1226,7 @@ func rowsFromEvents(events []xrayEvent) []LogQueryRow {
 }
 
 func oreCounts(counts map[string]int64, rareOnly bool) []XrayOreCount {
-	var result []XrayOreCount
+	result := make([]XrayOreCount, 0)
 	for _, typ := range catalog.OreTypes {
 		count := counts[typ.Type]
 		if count == 0 {

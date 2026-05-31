@@ -530,12 +530,13 @@ async function loadAll() {
       apiGet('/api/stats/daily', baseParams),
       apiGet('/api/stats/imports', { serverId: baseParams.serverId, limit: 20 })
     ])
-    serverOptions.value = optionsData.length ? optionsData : serverOptions.value
-    serverSummaries.value = serverData
+    const options = asArray(optionsData)
+    serverOptions.value = options.length ? options : serverOptions.value
+    serverSummaries.value = asArray(serverData)
     overview.value = overviewData || emptyOverview()
-    players.value = playerData
-    daily.value = dailyData
-    imports.value = importData
+    players.value = asArray(playerData)
+    daily.value = asArray(dailyData)
+    imports.value = asArray(importData)
   } catch (err) {
     handleApiError(err)
   } finally {
@@ -570,9 +571,9 @@ async function loadImportFiles({ resetJob = false } = {}) {
   importPageLoading.value = true
   error.value = ''
   try {
-    importFiles.value = await apiGet('/api/import/files', {
+    importFiles.value = asArray(await apiGet('/api/import/files', {
       serverId: filters.value.serverId === 'all' ? '' : filters.value.serverId
-    })
+    }))
     if (resetJob) {
       importJob.value = null
       importing.value = false
@@ -751,8 +752,8 @@ async function loadSyncPageFiles() {
       apiGet('/api/import/remote-files', params),
       apiGet('/api/import/files', params)
     ])
-    remoteFiles.value = remoteData
-    syncLocalFiles.value = localData
+    remoteFiles.value = asArray(remoteData)
+    syncLocalFiles.value = asArray(localData)
     selectedLocalDeleteKeys.value = new Set()
   } catch (err) {
     handleApiError(err)
@@ -817,9 +818,9 @@ function stopSyncJobPolling() {
 
 async function loadSyncLocalFiles() {
   try {
-    syncLocalFiles.value = await apiGet('/api/import/files', {
+    syncLocalFiles.value = asArray(await apiGet('/api/import/files', {
       serverId: filters.value.serverId === 'all' ? '' : filters.value.serverId
-    })
+    }))
     selectedLocalDeleteKeys.value = new Set()
   } catch (err) {
     handleApiError(err)
@@ -1544,7 +1545,7 @@ async function loadAstrbotKey() {
 async function loadAutoTaskLogs() {
   autoTaskLogsLoading.value = true
   try {
-    autoTaskLogs.value = await apiGet('/api/import/auto-task-logs', { limit: 80 })
+    autoTaskLogs.value = asArray(await apiGet('/api/import/auto-task-logs', { limit: 80 }))
   } catch (err) {
     handleApiError(err)
   } finally {
@@ -1624,7 +1625,7 @@ async function loadSourceFiles(sourceId) {
   try {
     const result = await apiGet('/api/config/source-files', { sourceId })
     if (result.success) {
-      sourceFiles.value = { ...sourceFiles.value, [sourceId]: result.files }
+      sourceFiles.value = { ...sourceFiles.value, [sourceId]: asArray(result.files) }
     } else {
       sourceFiles.value = { ...sourceFiles.value, [sourceId]: [] }
       error.value = result.message
@@ -1986,6 +1987,10 @@ function emptyOverview() {
     importedFileCount: 0,
     lastImportedAt: null
   }
+}
+
+function asArray(value) {
+  return Array.isArray(value) ? value : []
 }
 
 function formatNumber(value) {

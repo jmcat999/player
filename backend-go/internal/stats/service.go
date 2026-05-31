@@ -135,7 +135,7 @@ func (s *Service) Players(ctx context.Context, serverID string, from, to *time.T
 		return nil, err
 	}
 	defer rows.Close()
-	var result []PlayerSummary
+	result := make([]PlayerSummary, 0)
 	for rows.Next() {
 		var item PlayerSummary
 		if err := rows.Scan(&item.PlayerName, &item.BrokenCount, &item.PlacedCount); err != nil {
@@ -172,7 +172,7 @@ func (s *Service) Daily(ctx context.Context, serverID string, from, to *time.Tim
 		return nil, err
 	}
 	defer rows.Close()
-	var result []DailySummary
+	result := make([]DailySummary, 0)
 	for rows.Next() {
 		var statDate time.Time
 		var item DailySummary
@@ -197,7 +197,7 @@ func (s *Service) Servers(ctx context.Context, from, to *time.Time) ([]ServerSum
 		return nil, err
 	}
 	defer rows.Close()
-	var result []ServerSummary
+	result := make([]ServerSummary, 0)
 	for rows.Next() {
 		var item ServerSummary
 		if err := rows.Scan(&item.ServerID, &item.ServerName, &item.PlayerCount, &item.BrokenCount, &item.PlacedCount); err != nil {
@@ -237,7 +237,7 @@ func (s *Service) ImportedFiles(ctx context.Context, serverID string, limit int)
 		return nil, err
 	}
 	defer rows.Close()
-	var result []ImportedServerLogFileView
+	result := make([]ImportedServerLogFileView, 0)
 	for rows.Next() {
 		var item ImportedServerLogFileView
 		var logDate sql.NullTime
@@ -302,7 +302,7 @@ func (s *Service) aggregatePlayer(ctx context.Context, playerName string, from, 
 		return PlayerStatsResponse{}, false, nil
 	}
 
-	var servers []PlayerServerStatsResponse
+	servers := make([]PlayerServerStatsResponse, 0, len(s.cfg.Sources()))
 	var brokenTotal, placedTotal int64
 	var firstSeen *apitype.LocalDateTime
 	responseName := playerName

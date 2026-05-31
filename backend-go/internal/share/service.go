@@ -378,7 +378,7 @@ func (s *Service) PendingXrayGroupMessages(ctx context.Context, limit int) ([]Xr
 		return nil, err
 	}
 	defer rows.Close()
-	var result []XrayGroupMessageResponse
+	result := make([]XrayGroupMessageResponse, 0)
 	for rows.Next() {
 		var item XrayGroupMessageResponse
 		var fromTime, toTime time.Time

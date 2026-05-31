@@ -38,7 +38,7 @@ func NewService(db *sql.DB, cfg config.Config, settingsService *settings.Service
 }
 
 func (s *Service) ListLocalImportFiles(ctx context.Context, requestedServerID string) ([]ImportFileStatus, error) {
-	var result []ImportFileStatus
+	result := make([]ImportFileStatus, 0)
 	for _, source := range s.selectedSources(ctx, requestedServerID) {
 		files, err := s.localFiles(source)
 		if err != nil {
@@ -69,7 +69,7 @@ func (s *Service) ListRemoteSMBFiles(ctx context.Context, requestedServerID stri
 
 func (s *Service) ImportFromConfiguredSource(ctx context.Context, requestedServerID string, skipToday bool, listener ProgressListener) (ImportRunResult, error) {
 	startedAt := time.Now().UTC()
-	var files []FileImportResult
+	files := make([]FileImportResult, 0)
 	for _, source := range s.selectedSources(ctx, requestedServerID) {
 		localFiles, err := s.localFiles(source)
 		if err != nil {
@@ -224,7 +224,7 @@ func (s *Service) LatestAutoTaskLogs(ctx context.Context, limit int) ([]AutoTask
 		return nil, err
 	}
 	defer rows.Close()
-	var result []AutoTaskLogView
+	result := make([]AutoTaskLogView, 0)
 	for rows.Next() {
 		var item AutoTaskLogView
 		if err := rows.Scan(&item.ID, &item.CreatedAt, &item.ServerID, &item.ServerName, &item.TaskType,
@@ -387,7 +387,7 @@ func (s *Service) statusFromRecord(source config.Source, file RemoteLogFile, log
 func (s *Service) selectedSources(ctx context.Context, requestedServerID string) []config.Source {
 	requestedServerID = strings.TrimSpace(requestedServerID)
 	all := requestedServerID == "" || strings.EqualFold(requestedServerID, "all") || strings.EqualFold(requestedServerID, "total")
-	var result []config.Source
+	result := make([]config.Source, 0)
 	for _, source := range s.cfg.Sources() {
 		if !all && source.ID != requestedServerID {
 			continue
@@ -422,7 +422,7 @@ func (s *Service) localFiles(source config.Source) ([]RemoteLogFile, error) {
 	if err := os.MkdirAll(directory, 0755); err != nil {
 		return nil, err
 	}
-	var files []RemoteLogFile
+	files := make([]RemoteLogFile, 0)
 	err = filepath.WalkDir(directory, func(path string, entry fs.DirEntry, err error) error {
 		if err != nil {
 			return nil

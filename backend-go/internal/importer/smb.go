@@ -20,7 +20,7 @@ import (
 )
 
 func (s *Service) listRemoteSMBFiles(ctx context.Context, requestedServerID string) ([]ImportFileStatus, error) {
-	var result []ImportFileStatus
+	result := make([]ImportFileStatus, 0)
 	err := s.withSMBShare(ctx, func(share *smb2.Share) error {
 		for _, source := range s.selectedSources(ctx, requestedServerID) {
 			sourceConfig, err := s.sourceSyncSettings(ctx, source)
@@ -70,7 +70,7 @@ func (s *Service) listRemoteSMBFiles(ctx context.Context, requestedServerID stri
 
 func (s *Service) syncFilesFromSMBSource(ctx context.Context, requestedServerID string, skipToday bool, listener ProgressListener) (ImportRunResult, error) {
 	startedAt := time.Now().UTC()
-	var results []FileImportResult
+	results := make([]FileImportResult, 0)
 	err := s.withSMBShare(ctx, func(share *smb2.Share) error {
 		for _, source := range s.selectedSources(ctx, requestedServerID) {
 			sourceConfig, err := s.sourceSyncSettings(ctx, source)
@@ -82,7 +82,7 @@ func (s *Service) syncFilesFromSMBSource(ctx context.Context, requestedServerID 
 				results = appendResult(results, listener, failedResult(source.ID, source.Name, sourceConfig.directory, err.Error()))
 				continue
 			}
-			var archivedFiles []RemoteLogFile
+			archivedFiles := make([]RemoteLogFile, 0, len(remoteFiles))
 			for _, file := range remoteFiles {
 				archivedFiles = append(archivedFiles, toArchivedSMBFile(source, file))
 			}
@@ -203,7 +203,7 @@ func listSMBFiles(share *smb2.Share, directory, glob string, recursive bool) ([]
 	if err != nil {
 		return nil, fmt.Errorf("列出 SMB 目录失败 [%s]: %w", directory, err)
 	}
-	var files []RemoteLogFile
+	files := make([]RemoteLogFile, 0)
 	for _, info := range infos {
 		name := info.Name()
 		if name == "." || name == ".." {
