@@ -553,7 +553,7 @@ func analyzePlayer(playerName string, events []xrayEvent) XrayPlayerRiskView {
 		UndergroundRareOreRatio:          sessionMetrics.rareRatio,
 		Reasons:                          reasons,
 		Ores:                             oreCounts(sessionMetrics.oreCounts, false),
-		RareOres:                         oreCounts(sessionMetrics.oreCounts, true),
+		RareOres:                         oreCounts(sessionMetrics.rareOreCounts, true),
 		Evidence:                         allEvidence,
 		RareOreRows:                      analysisMetrics.rareRows,
 		AnalysisBreaks:                   analysisMetrics.breaks,
@@ -570,7 +570,7 @@ func analyzePlayer(playerName string, events []xrayEvent) XrayPlayerRiskView {
 		AnalysisPeakRareVeinWindowCount:  analysisMetrics.peakRareVeinCount,
 		AnalysisUndergroundRareOreRatio:  analysisMetrics.rareRatio,
 		AnalysisOres:                     oreCounts(analysisMetrics.oreCounts, false),
-		AnalysisRareOres:                 oreCounts(analysisMetrics.oreCounts, true),
+		AnalysisRareOres:                 oreCounts(analysisMetrics.rareOreCounts, true),
 	}
 }
 
@@ -585,6 +585,7 @@ type playerMetrics struct {
 	ancientDebrisBreaks int64
 	rareRatio           float64
 	oreCounts           map[string]int64
+	rareOreCounts       map[string]int64
 	rareRows            []LogQueryRow
 	rareVeins           []rareVein
 	peakRareOreCount    int
@@ -598,7 +599,7 @@ type rareVein struct {
 }
 
 func collectMetrics(events []xrayEvent) playerMetrics {
-	metrics := playerMetrics{oreCounts: map[string]int64{}}
+	metrics := playerMetrics{oreCounts: map[string]int64{}, rareOreCounts: map[string]int64{}}
 	if len(events) == 0 {
 		return metrics
 	}
@@ -613,16 +614,19 @@ func collectMetrics(events []xrayEvent) playerMetrics {
 		if event.oreType != "" {
 			metrics.oreBreaks++
 			metrics.oreCounts[event.oreType]++
-		}
-		if event.rareOre {
-			metrics.rareOreBreaks++
-			metrics.rareRows = append(metrics.rareRows, event.row)
-			rareEvents = append(rareEvents, event)
 			if catalog.IsDiamond(event.oreType) {
 				metrics.diamondOreBreaks++
 			}
 			if catalog.IsAncientDebris(event.oreType) {
 				metrics.ancientDebrisBreaks++
+			}
+		}
+		if event.rareOre {
+			metrics.rareOreBreaks++
+			metrics.rareRows = append(metrics.rareRows, event.row)
+			rareEvents = append(rareEvents, event)
+			if event.oreType != "" {
+				metrics.rareOreCounts[event.oreType]++
 			}
 		}
 	}
@@ -640,15 +644,16 @@ func splitMiningSessions(events []xrayEvent) [][]xrayEvent {
 		return nil
 	}
 	var sessions [][]xrayEvent
-	current := []xrayEvent{events[0]}
-	for _, event := range events[1:] {
-		gap := event.happenedAt.Sub(current[len(current)-1].happenedAt)
-		if gap > miningSessionGapSeconds*time.Second {
+	var current []xrayEvent
+	for _, event := range events {
+		if !isMiningSessionEvent(event) {
+			continue
+		}
+		if len(current) > 0 && event.happenedAt.Sub(current[len(current)-1].happenedAt) > miningSessionGapSeconds*time.Second {
 			if len(current) >= miningSessionEvents {
 				sessions = append(sessions, current)
 			}
-			current = []xrayEvent{event}
-			continue
+			current = nil
 		}
 		current = append(current, event)
 	}
@@ -659,6 +664,17 @@ func splitMiningSessions(events []xrayEvent) [][]xrayEvent {
 		return [][]xrayEvent{events}
 	}
 	return sessions
+}
+
+func isMiningSessionEvent(event xrayEvent) bool {
+	if !event.hasPoint {
+		return false
+	}
+	underground := event.point.y <= 16
+	if catalog.IsAncientDebris(event.oreType) {
+		underground = event.point.y <= 32
+	}
+	return underground && (event.tunnelBlock || event.oreType != "")
 }
 
 func buildRareVeins(events []xrayEvent) []rareVein {
@@ -804,8 +820,8 @@ func detectDirectVeinEvidence(events []xrayEvent) []XrayEvidenceView {
 			if dist < minDirectVeinDistance || dist > maxDirectVeinDistance {
 				continue
 			}
-			gapBlocks := tunnelBlocksBetween(events, a.happenedAt, b.happenedAt)
-			if gapBlocks > maxDirectVeinGapBlocks {
+			gapBlocks := undergroundBlocksBetween(events, a, b)
+			if gapBlocks == 0 || gapBlocks > maxDirectVeinGapBlocks {
 				continue
 			}
 			used[i], used[j] = true, true
@@ -1145,9 +1161,10 @@ func recentTunnelEvents(events []xrayEvent, target xrayEvent, seconds int) []xra
 		if target.happenedAt.Sub(event.happenedAt) > time.Duration(seconds)*time.Second {
 			break
 		}
-		if event.tunnelBlock && event.hasPoint && event.row.Dimension2 == target.row.Dimension2 {
-			result = append(result, event)
+		if event.row.Dimension2 != target.row.Dimension2 || !event.tunnelBlock || !event.hasPoint {
+			break
 		}
+		result = append(result, event)
 	}
 	for left, right := 0, len(result)-1; left < right; left, right = left+1, right-1 {
 		result[left], result[right] = result[right], result[left]
@@ -1196,10 +1213,13 @@ func distance(a, b point3) float64 {
 	return math.Sqrt(dx*dx + dy*dy + dz*dz)
 }
 
-func tunnelBlocksBetween(events []xrayEvent, start, end time.Time) int {
+func undergroundBlocksBetween(events []xrayEvent, start, end xrayEvent) int {
 	count := 0
 	for _, event := range events {
-		if event.happenedAt.After(start) && event.happenedAt.Before(end) && event.tunnelBlock {
+		if event.happenedAt.After(start.happenedAt) &&
+			event.happenedAt.Before(end.happenedAt) &&
+			event.row.Dimension2 == end.row.Dimension2 &&
+			isMiningSessionEvent(event) {
 			count++
 		}
 	}
