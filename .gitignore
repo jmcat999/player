@@ -1,6 +1,7 @@
 backend/target/
 backend/data/
 backend/
+backend-java/
 backend/synced-logs/
 docs/
 .idea/

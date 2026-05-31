@@ -8,6 +8,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strings"
 	"time"
@@ -41,23 +42,7 @@ func (s *Service) listRemoteSMBFiles(ctx context.Context, requestedServerID stri
 				continue
 			}
 			for _, file := range limitFiles(files, s.cfg.MaxFilesPerRun) {
-				logDate := extractLogDate(file.FileName, s.cfg.Location)
-				var apiLogDate *apitype.Date
-				if logDate != nil {
-					value := apitype.NewDate(*logDate)
-					apiLogDate = &value
-				}
-				result = append(result, ImportFileStatus{
-					ServerID:     source.ID,
-					ServerName:   source.Name,
-					RemotePath:   file.Path,
-					FileName:     file.FileName,
-					FileSize:     file.Size,
-					LastModified: file.LastModified,
-					LogDate:      apiLogDate,
-					Status:       "REMOTE",
-					Message:      "远程文件",
-				})
+				result = append(result, s.remoteFileStatus(source, file, toArchivedSMBFile(source, file)))
 			}
 		}
 		return nil
@@ -129,11 +114,17 @@ type smbSourceSettings struct {
 }
 
 func (s *Service) sourceSyncSettings(ctx context.Context, source config.Source) (smbSourceSettings, error) {
-	result := smbSourceSettings{fileGlob: source.FileGlob}
+	result := smbSourceSettings{
+		directory: strings.TrimSpace(s.cfg.SMBDirectory),
+		fileGlob:  firstNonBlank(s.cfg.SMBFileGlob, source.FileGlob),
+		recursive: s.cfg.SMBRecursive,
+	}
 	if sourceConfig, ok, err := s.settings.SourceByID(ctx, source.ID); err != nil {
 		return result, err
 	} else if ok {
-		result.directory = strings.TrimSpace(sourceConfig.SMBDirectory)
+		if strings.TrimSpace(sourceConfig.SMBDirectory) != "" {
+			result.directory = strings.TrimSpace(sourceConfig.SMBDirectory)
+		}
 		if strings.TrimSpace(sourceConfig.SMBFileGlob) != "" {
 			result.fileGlob = sourceConfig.SMBFileGlob
 		}
@@ -247,6 +238,47 @@ func toArchivedSMBFile(source config.Source, remoteFile RemoteLogFile) RemoteLog
 	}
 }
 
+func (s *Service) remoteFileStatus(source config.Source, remoteFile, archivedFile RemoteLogFile) ImportFileStatus {
+	logDate := extractLogDate(remoteFile.FileName, s.cfg.Location)
+	effectiveDate := logDate
+	if effectiveDate == nil {
+		value := dateOnly(remoteFile.LastModified.In(s.cfg.Location), s.cfg.Location)
+		effectiveDate = &value
+	}
+	var apiLogDate *apitype.Date
+	if logDate != nil {
+		value := apitype.NewDate(*logDate)
+		apiLogDate = &value
+	}
+
+	status := "REMOTE"
+	message := "远程文件，待复制"
+	today := dateOnly(time.Now().In(s.cfg.Location), s.cfg.Location)
+	if s.cfg.SkipToday && !effectiveDate.Before(today) {
+		status = "SKIPPED_TODAY"
+		message = "跳过当天或未来的日志文件"
+	} else if currentArchiveFile(archivedFile.Path, archivedFile) {
+		status = "COPIED"
+		message = "本地 CSV 文件未变化"
+	} else if archiveExists(archivedFile.Path) {
+		status = "CHANGED"
+		message = "远程文件与本地 CSV 不一致，可重新复制"
+	}
+
+	return ImportFileStatus{
+		ServerID:     source.ID,
+		ServerName:   source.Name,
+		RemotePath:   remoteFile.Path,
+		LocalPath:    archivedFile.Path,
+		FileName:     remoteFile.FileName,
+		FileSize:     remoteFile.Size,
+		LastModified: remoteFile.LastModified,
+		LogDate:      apiLogDate,
+		Status:       status,
+		Message:      message,
+	}
+}
+
 func copySMBFileToArchive(share *smb2.Share, file RemoteLogFile) (bool, error) {
 	localPath, err := filepath.Abs(file.Path)
 	if err != nil {
@@ -268,28 +300,56 @@ func copySMBFileToArchive(share *smb2.Share, file RemoteLogFile) (bool, error) {
 	}
 	defer remote.Close()
 
-	tempPath := localPath + ".tmp"
-	out, err := os.Create(tempPath)
-	if err != nil {
+	if err := writeArchiveFile(remote, localPath, file.LastModified); err != nil {
 		return false, err
 	}
-	_, copyErr := io.Copy(out, remote)
+	return true, nil
+}
+
+func writeArchiveFile(reader io.Reader, localPath string, lastModified time.Time) error {
+	if err := os.MkdirAll(filepath.Dir(localPath), 0755); err != nil {
+		return err
+	}
+	_ = os.Remove(localPath + ".tmp")
+
+	out, err := os.CreateTemp(filepath.Dir(localPath), filepath.Base(localPath)+".*.tmp")
+	if err != nil {
+		return err
+	}
+	tempPath := out.Name()
+	renamed := false
+	defer func() {
+		if !renamed {
+			_ = os.Remove(tempPath)
+		}
+	}()
+
+	_, copyErr := io.Copy(out, reader)
 	closeErr := out.Close()
 	if copyErr != nil {
-		_ = os.Remove(tempPath)
-		return false, copyErr
+		return copyErr
 	}
 	if closeErr != nil {
-		_ = os.Remove(tempPath)
-		return false, closeErr
+		return closeErr
 	}
-	_ = os.Remove(localPath)
+	if err := replaceFile(tempPath, localPath); err != nil {
+		return err
+	}
+	renamed = true
+	_ = os.Chmod(localPath, 0644)
+	_ = os.Chtimes(localPath, lastModified, lastModified)
+	return nil
+}
+
+func replaceFile(tempPath, localPath string) error {
 	if err := os.Rename(tempPath, localPath); err != nil {
-		_ = os.Remove(tempPath)
-		return false, err
+		if runtime.GOOS != "windows" {
+			return err
+		}
+		_ = os.Remove(localPath)
+		return os.Rename(tempPath, localPath)
 	}
-	_ = os.Chtimes(localPath, file.LastModified, file.LastModified)
-	return true, nil
+	return nil
 }
 
 func currentArchiveFile(localPath string, file RemoteLogFile) bool {
@@ -298,6 +358,11 @@ func currentArchiveFile(localPath string, file RemoteLogFile) bool {
 		return false
 	}
 	return info.Size() == file.Size && info.ModTime().UTC().UnixMilli() == file.LastModified.UTC().UnixMilli()
+}
+
+func archiveExists(localPath string) bool {
+	info, err := os.Stat(localPath)
+	return err == nil && !info.IsDir()
 }
 
 func normalizeSMBPath(value string) string {
@@ -316,4 +381,13 @@ func joinSMBPath(directory, name string) string {
 		return name
 	}
 	return directory + "/" + name
+}
+
+func firstNonBlank(values ...string) string {
+	for _, value := range values {
+		if strings.TrimSpace(value) != "" {
+			return strings.TrimSpace(value)
+		}
+	}
+	return ""
 }

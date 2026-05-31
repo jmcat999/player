@@ -2108,6 +2108,17 @@ function localCopyInfo(remoteFile) {
     }
   }
 
+  const remoteModified = new Date(remoteFile?.lastModified || 0).getTime()
+  const localModified = new Date(localFile.lastModified || 0).getTime()
+  if (remoteModified && localModified && remoteModified !== localModified) {
+    return {
+      label: '时间不一致',
+      className: 'pending',
+      fileSize: localSize,
+      message: `本地 ${formatDateTime(localFile.lastModified)}，远程 ${formatDateTime(remoteFile.lastModified)}，状态：${statusLabel(localFile.status)}`
+    }
+  }
+
   return {
     label: '已在本地',
     className: 'imported',

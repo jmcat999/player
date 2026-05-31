@@ -371,6 +371,7 @@ func (s *Service) statusFromRecord(source config.Source, file RemoteLogFile, log
 		ServerID:     source.ID,
 		ServerName:   source.Name,
 		RemotePath:   file.Path,
+		LocalPath:    file.Path,
 		FileName:     file.FileName,
 		FileSize:     file.Size,
 		LastModified: file.LastModified,

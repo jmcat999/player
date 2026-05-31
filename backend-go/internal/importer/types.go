@@ -18,6 +18,7 @@ type ImportFileStatus struct {
 	ServerID     string        `json:"serverId"`
 	ServerName   string        `json:"serverName"`
 	RemotePath   string        `json:"remotePath"`
+	LocalPath    string        `json:"localPath,omitempty"`
 	FileName     string        `json:"fileName"`
 	FileSize     int64         `json:"fileSize"`
 	LastModified time.Time     `json:"lastModified"`
