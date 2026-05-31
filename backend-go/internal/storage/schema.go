@@ -240,31 +240,6 @@ var schemaStatements = []string{
 		KEY idx_xray_share_tokens_server_player (server_id, player_name)
 	) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
 
-	`CREATE TABLE IF NOT EXISTS xray_group_messages (
-		id BIGINT NOT NULL AUTO_INCREMENT,
-		status VARCHAR(24) NOT NULL,
-		share_path VARCHAR(160) NOT NULL,
-		server_id VARCHAR(64) NOT NULL,
-		server_name VARCHAR(120) NOT NULL,
-		player_name VARCHAR(255) NOT NULL,
-		risk_score INT NOT NULL,
-		risk_level VARCHAR(32) NOT NULL,
-		rare_ore_breaks BIGINT NOT NULL,
-		straight_mine_hits INT NOT NULL,
-		peak_rare_ore_window_count INT NOT NULL,
-		from_time DATETIME(6) NOT NULL,
-		to_time DATETIME(6) NOT NULL,
-		ttl_minutes INT NOT NULL,
-		created_at DATETIME(6) NOT NULL,
-		expires_at DATETIME(6) NOT NULL,
-		delivered_at DATETIME(6),
-		failed_at DATETIME(6),
-		failure_message TEXT,
-		PRIMARY KEY (id),
-		KEY idx_xray_group_messages_status (status, created_at),
-		KEY idx_xray_group_messages_expires (expires_at)
-	) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
-
 	`CREATE TABLE IF NOT EXISTS xray_analysis_jobs (
 		job_id VARCHAR(64) NOT NULL,
 		server_id VARCHAR(64) NOT NULL,

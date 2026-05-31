@@ -106,7 +106,7 @@ xray_group_id = 123456789
 
 ## WebSocket group sending
 
-`enable_xray_group_ws = true` is enabled by default. When Vue creates a Send to QQ group task, the plugin receives it through WebSocket first. If WebSocket disconnects or the backend is temporarily unreachable, the plugin automatically falls back to HTTP polling, so already-created tasks are still kept in the backend queue.
+`enable_xray_group_ws = true` is enabled by default. When Vue creates a Send to QQ group task, the plugin receives it through WebSocket first. If WebSocket disconnects or the backend is temporarily unreachable, the plugin retries the WebSocket connection. Already-created tasks stay in the backend memory queue for up to 10 minutes and are sent after reconnect.
 
 If AstrBot runs in Docker, do not set `api_base_url` to `http://127.0.0.1:9493` unless the backend is in the same container. Use the backend service name, host LAN IP, or another address reachable from the AstrBot container, for example:
 

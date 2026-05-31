@@ -28,6 +28,7 @@ class PlayerStatsPlugin(Star):
         super().__init__(context)
         self.config = config
         self._xray_group_task = None
+        self._last_xray_ws_error = ""
         try:
             self._xray_group_task = asyncio.create_task(self._xray_group_sender_loop())
         except RuntimeError as ex:
@@ -284,9 +285,13 @@ class PlayerStatsPlugin(Star):
                 except asyncio.CancelledError:
                     raise
                 except Exception as ex:
-                    logger.warning(f"xray group websocket disconnected, fallback to polling: {ex}")
-                    await self._send_pending_xray_group_messages()
-                    await asyncio.sleep(self._xray_group_poll_seconds())
+                    error_text = str(ex)
+                    if error_text != self._last_xray_ws_error:
+                        logger.warning(f"xray group websocket disconnected, will retry: {ex}")
+                        self._last_xray_ws_error = error_text
+                    else:
+                        logger.debug(f"xray group websocket still unavailable: {ex}")
+                    await asyncio.sleep(max(30, self._xray_group_poll_seconds()))
             else:
                 await self._send_pending_xray_group_messages()
                 await asyncio.sleep(self._xray_group_poll_seconds())

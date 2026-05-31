@@ -7,6 +7,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -21,17 +22,34 @@ import (
 )
 
 type Service struct {
-	db       *sql.DB
-	cfg      config.Config
-	settings *settings.Service
-	stats    *stats.Service
-	xray     *importer.XrayAnalysisService
-	mu       sync.Mutex
-	xraySubs map[chan XrayGroupMessageResponse]struct{}
+	db                *sql.DB
+	cfg               config.Config
+	settings          *settings.Service
+	stats             *stats.Service
+	xray              *importer.XrayAnalysisService
+	mu                sync.Mutex
+	xraySubs          map[chan XrayGroupMessageResponse]struct{}
+	xrayMessages      map[int64]queuedXrayGroupMessage
+	nextXrayMessageID int64
 }
 
 func NewService(db *sql.DB, cfg config.Config, settingsService *settings.Service, statsService *stats.Service, xrayService *importer.XrayAnalysisService) *Service {
-	return &Service{db: db, cfg: cfg, settings: settingsService, stats: statsService, xray: xrayService, xraySubs: map[chan XrayGroupMessageResponse]struct{}{}}
+	return &Service{
+		db:           db,
+		cfg:          cfg,
+		settings:     settingsService,
+		stats:        statsService,
+		xray:         xrayService,
+		xraySubs:     map[chan XrayGroupMessageResponse]struct{}{},
+		xrayMessages: map[int64]queuedXrayGroupMessage{},
+	}
+}
+
+const xrayGroupMessageTTL = 10 * time.Minute
+
+type queuedXrayGroupMessage struct {
+	message   XrayGroupMessageResponse
+	createdAt time.Time
 }
 
 type ShareTokenResponse struct {
@@ -320,18 +338,7 @@ func (s *Service) SendXrayToGroup(ctx context.Context, request XrayGroupSendRequ
 	if err != nil {
 		return XrayGroupSendResponse{}, err
 	}
-	result, err := s.db.ExecContext(ctx, `
-		insert into xray_group_messages
-		    (status, share_path, server_id, server_name, player_name, risk_score, risk_level, rare_ore_breaks,
-		     straight_mine_hits, peak_rare_ore_window_count, from_time, to_time, ttl_minutes, created_at, expires_at)
-		values ('PENDING', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-	`, sharePath, snapshot.serverID, snapshot.serverName, snapshot.player.PlayerName, snapshot.player.RiskScore,
-		snapshot.player.RiskLevel, snapshot.player.MiningSessionRareOreBreaks, snapshot.player.TrackingEvidenceCount,
-		snapshot.player.PeakRareOreWindowCount, snapshot.fromTime, snapshot.toTime, ttl, now, expiresAt)
-	if err != nil {
-		return XrayGroupSendResponse{}, err
-	}
-	messageID, _ := result.LastInsertId()
+	messageID := s.nextXrayGroupMessageID()
 	response := XrayGroupSendResponse{
 		MessageID:  messageID,
 		SharePath:  sharePath,
@@ -344,7 +351,7 @@ func (s *Service) SendXrayToGroup(ctx context.Context, request XrayGroupSendRequ
 		ExpiresAt:  expiresAt,
 		TTLMinutes: ttl,
 	}
-	s.broadcastXrayGroupMessage(XrayGroupMessageResponse{
+	s.enqueueXrayGroupMessage(XrayGroupMessageResponse{
 		ID:                         messageID,
 		SharePath:                  sharePath,
 		ServerID:                   response.ServerID,
@@ -382,13 +389,69 @@ func (s *Service) SubscribeXrayGroupMessages(buffer int) (<-chan XrayGroupMessag
 	return ch, unsubscribe
 }
 
-func (s *Service) broadcastXrayGroupMessage(message XrayGroupMessageResponse) {
+func (s *Service) nextXrayGroupMessageID() int64 {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	s.nextXrayMessageID++
+	return s.nextXrayMessageID
+}
+
+func (s *Service) enqueueXrayGroupMessage(message XrayGroupMessageResponse) {
+	now := time.Now().UTC()
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.pruneExpiredXrayMessagesLocked(now)
+	s.xrayMessages[message.ID] = queuedXrayGroupMessage{message: message, createdAt: now}
 	for ch := range s.xraySubs {
 		select {
 		case ch <- message:
 		default:
+		}
+	}
+}
+
+func (s *Service) pendingXrayGroupMessages(limit int) []XrayGroupMessageResponse {
+	now := time.Now().UTC()
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.pruneExpiredXrayMessagesLocked(now)
+
+	items := make([]queuedXrayGroupMessage, 0, len(s.xrayMessages))
+	for _, item := range s.xrayMessages {
+		items = append(items, item)
+	}
+	sort.Slice(items, func(i, j int) bool {
+		if items[i].createdAt.Equal(items[j].createdAt) {
+			return items[i].message.ID < items[j].message.ID
+		}
+		return items[i].createdAt.Before(items[j].createdAt)
+	})
+
+	result := make([]XrayGroupMessageResponse, 0, min(limit, len(items)))
+	for _, item := range items {
+		if len(result) >= limit {
+			break
+		}
+		result = append(result, item.message)
+	}
+	return result
+}
+
+func (s *Service) removeXrayGroupMessage(messageID int64) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.pruneExpiredXrayMessagesLocked(time.Now().UTC())
+	if _, ok := s.xrayMessages[messageID]; !ok {
+		return false
+	}
+	delete(s.xrayMessages, messageID)
+	return true
+}
+
+func (s *Service) pruneExpiredXrayMessagesLocked(now time.Time) {
+	for messageID, item := range s.xrayMessages {
+		if !item.createdAt.Add(xrayGroupMessageTTL).After(now) {
+			delete(s.xrayMessages, messageID)
 		}
 	}
 }
@@ -416,56 +479,16 @@ func (s *Service) XrayDetails(ctx context.Context, token string) (XrayShareDetai
 
 func (s *Service) PendingXrayGroupMessages(ctx context.Context, limit int) ([]XrayGroupMessageResponse, error) {
 	limit = max(1, min(limit, 10))
-	rows, err := s.db.QueryContext(ctx, `
-		select id, share_path, server_id, server_name, player_name, risk_score, risk_level, rare_ore_breaks,
-		       straight_mine_hits, peak_rare_ore_window_count, from_time, to_time, expires_at, ttl_minutes
-		from xray_group_messages
-		where status = 'PENDING' and expires_at > ?
-		order by created_at asc
-		limit ?
-	`, time.Now().UTC(), limit)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	result := make([]XrayGroupMessageResponse, 0)
-	for rows.Next() {
-		var item XrayGroupMessageResponse
-		var fromTime, toTime time.Time
-		if err := rows.Scan(&item.ID, &item.SharePath, &item.ServerID, &item.ServerName, &item.PlayerName,
-			&item.RiskScore, &item.RiskLevel, &item.MiningSessionRareOreBreaks, &item.TrackingEvidenceCount,
-			&item.PeakRareOreWindowCount, &fromTime, &toTime, &item.ExpiresAt, &item.TTLMinutes); err != nil {
-			return nil, err
-		}
-		item.FromTime = localDateTimePtr(&fromTime)
-		item.ToTime = localDateTimePtr(&toTime)
-		result = append(result, item)
-	}
-	return result, rows.Err()
+	return s.pendingXrayGroupMessages(limit), nil
 }
 
 func (s *Service) MarkXrayGroupDelivery(ctx context.Context, messageID int64, success bool, errorMessage string) (XrayGroupDeliveryResponse, error) {
 	status := "FAILED"
-	deliveredAt := any(nil)
-	failedAt := any(time.Now().UTC())
-	failureMessage := truncate(errorMessage, 2000)
 	if success {
 		status = "SENT"
-		deliveredAt = time.Now().UTC()
-		failedAt = nil
-		failureMessage = ""
 	}
-	result, err := s.db.ExecContext(ctx, `
-		update xray_group_messages
-		set status = ?, delivered_at = ?, failed_at = ?, failure_message = ?
-		where id = ?
-	`, status, deliveredAt, failedAt, failureMessage, messageID)
-	if err != nil {
-		return XrayGroupDeliveryResponse{}, err
-	}
-	affected, _ := result.RowsAffected()
-	if affected == 0 {
-		return XrayGroupDeliveryResponse{}, auth.NewHTTPError(httpStatusNotFound, "发送任务不存在")
+	if !s.removeXrayGroupMessage(messageID) {
+		return XrayGroupDeliveryResponse{}, auth.NewHTTPError(httpStatusNotFound, "发送任务不存在或已过期")
 	}
 	return XrayGroupDeliveryResponse{MessageID: messageID, Status: status}, nil
 }
@@ -768,9 +791,6 @@ func (s *Service) deleteExpiredTokens(ctx context.Context) error {
 		return err
 	}
 	if _, err := s.db.ExecContext(ctx, `delete from xray_share_tokens where expires_at < ?`, now); err != nil {
-		return err
-	}
-	if _, err := s.db.ExecContext(ctx, `delete from xray_group_messages where expires_at < ?`, now); err != nil {
 		return err
 	}
 	return nil

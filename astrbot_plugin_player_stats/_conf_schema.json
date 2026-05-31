@@ -33,7 +33,7 @@
     "description": "Enable WebSocket xray group sending",
     "type": "bool",
     "default": true,
-    "hint": "Use WebSocket push first; if disconnected, the plugin falls back to HTTP polling."
+    "hint": "Use WebSocket push. If disconnected, the plugin reconnects; in-memory pending tasks are sent after reconnect and expire after 10 minutes."
   },
   "timeout_seconds": {
     "description": "请求超时时间（秒）",
