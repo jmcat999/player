@@ -16,7 +16,7 @@ from astrbot.core.star.filter.command import GreedyStr
     "player_stats",
     "Codex",
     "查询 Minecraft 玩家在主服和 2服的方块统计",
-    "0.10.3",
+    "0.10.4",
 )
 class PlayerStatsPlugin(Star):
     SERVERS = (
@@ -42,8 +42,19 @@ class PlayerStatsPlugin(Star):
             yield event.plain_result("请输入游戏 ID，例如：/绑定游戏id Steve\n注意：/绑定游戏id 和 Steve 中间要有空格。")
             return
 
-        await self.put_kv_data(self._binding_key(event), game_id)
-        yield event.plain_result(f"已绑定游戏 ID：{game_id}\n之后发送 /我的游戏信息 即可查询。")
+        check = await self._check_player_exists(game_id)
+        if not check["ok"]:
+            yield event.plain_result(check["message"])
+            return
+
+        canonical_game_id = check.get("player_name") or game_id
+        await self.put_kv_data(self._binding_key(event), canonical_game_id)
+        servers = "、".join(check.get("servers") or [])
+        yield event.plain_result(
+            f"已绑定游戏 ID：{canonical_game_id}\n"
+            f"已在服务器中找到：{servers}\n"
+            "之后发送 /我的游戏信息 即可查询。"
+        )
 
     @filter.command("我的游戏信息", alias={"我的信息", "我的统计", "方块统计"})
     async def my_game_stats(self, event: AstrMessageEvent):
@@ -160,6 +171,78 @@ class PlayerStatsPlugin(Star):
             params["from"] = from_date
         if to_date:
             params["to"] = to_date
+
+        async with httpx.AsyncClient(timeout=timeout_seconds) as client:
+            response = await client.get(
+                f"{base_url}/api/stats/player",
+                params=params,
+                headers=self._auth_headers(),
+            )
+            response.raise_for_status()
+            return response.json()
+
+    async def _check_player_exists(self, game_id: str) -> dict[str, Any]:
+        tasks = [self._fetch_player_presence(game_id, server_id) for server_id, _ in self.SERVERS]
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+
+        found_servers: list[str] = []
+        canonical_name = ""
+        for (server_id, server_name), result in zip(self.SERVERS, results, strict=True):
+            if isinstance(result, httpx.HTTPStatusError) and result.response.status_code == 404:
+                continue
+            if isinstance(result, httpx.ConnectError):
+                return {
+                    "ok": False,
+                    "message": "绑定失败：统计后端没有连接上，请稍后再试。",
+                }
+            if isinstance(result, httpx.TimeoutException):
+                return {
+                    "ok": False,
+                    "message": "绑定失败：统计后端响应超时，请稍后再试。",
+                }
+            if isinstance(result, httpx.HTTPStatusError):
+                logger.warning(f"check player api error: {result.response.status_code} {result.response.text}")
+                if result.response.status_code == 401:
+                    return {
+                        "ok": False,
+                        "message": "绑定失败：统计后端拒绝访问，请在 AstrBot 插件配置里填写插件密钥 api_key。",
+                    }
+                return {
+                    "ok": False,
+                    "message": f"绑定失败：统计后端返回 {result.response.status_code}。",
+                }
+            if isinstance(result, Exception):
+                logger.exception(f"check player exists failed on {server_id}: {result}")
+                return {
+                    "ok": False,
+                    "message": "绑定失败：机器人插件内部错误，请看 AstrBot 日志。",
+                }
+
+            found_servers.append(server_name)
+            if not canonical_name:
+                canonical_name = str(result.get("playerName") or "").strip()
+
+        if not found_servers:
+            return {
+                "ok": False,
+                "message": (
+                    f"绑定失败：没有在主服或 2服找到玩家 ID：{game_id}\n"
+                    "请确认大小写和游戏内名字是否正确，或等待日志导入后再绑定。"
+                ),
+            }
+        return {
+            "ok": True,
+            "player_name": canonical_name or game_id,
+            "servers": found_servers,
+        }
+
+    async def _fetch_player_presence(self, game_id: str, server_id: str) -> dict[str, Any]:
+        base_url = self._api_base_url()
+        timeout_seconds = float(self.config.get("timeout_seconds", 8))
+        params: dict[str, str] = {
+            "serverId": server_id,
+            "playerName": game_id,
+        }
 
         async with httpx.AsyncClient(timeout=timeout_seconds) as client:
             response = await client.get(
