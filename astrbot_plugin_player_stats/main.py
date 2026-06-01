@@ -16,7 +16,7 @@ from astrbot.core.star.filter.command import GreedyStr
     "player_stats",
     "Codex",
     "查询 Minecraft 玩家在主服和 2服的方块统计",
-    "0.10.5",
+    "0.10.6",
 )
 class PlayerStatsPlugin(Star):
     SERVERS = (
@@ -189,8 +189,9 @@ class PlayerStatsPlugin(Star):
                 return {
                     "ok": False,
                     "message": (
-                        f"绑定失败：没有这个玩家信息：{game_id}\n"
-                        "请确认大小写和游戏内名字是否正确，或等待日志导入后再绑定。"
+                        f"绑定失败!没有这个玩家信息：{game_id}\n"
+                        "请确认大小写和游戏内名字是否正确，或等待数据更新后再尝试绑定。"
+                        "(数据每天凌晨0~1点自动更新)"
                     ),
                 }
             logger.warning(f"check player presence api error: {ex.response.status_code} {ex.response.text}")
@@ -230,8 +231,9 @@ class PlayerStatsPlugin(Star):
             return {
                 "ok": False,
                 "message": (
-                    f"绑定失败：没有这个玩家信息：{game_id}\n"
-                    "请确认大小写和游戏内名字是否正确，或等待日志导入后再绑定。"
+                    f"绑定失败!没有这个玩家信息：{game_id}\n"
+                    "请确认大小写和游戏内名字是否正确，或等待数据更新后再尝试绑定。"
+                    "(数据每天凌晨0~1点自动更新)"
                 ),
             }
         canonical_name = str(result.get("playerName") or "").strip()
