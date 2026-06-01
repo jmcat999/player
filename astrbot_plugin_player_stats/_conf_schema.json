@@ -64,6 +64,24 @@
     "default": 7,
     "hint": "范围 1-90，活跃榜会返回最近 N 天的活跃玩家。"
   },
+  "log_query_hourly_limit": {
+    "description": "查日志每小时次数",
+    "type": "int",
+    "default": 5,
+    "hint": "每个绑定游戏 ID 在 1 小时内最多使用 /查日志 的次数，范围 1-60。"
+  },
+  "log_query_result_limit": {
+    "description": "查日志返回条数",
+    "type": "int",
+    "default": 8,
+    "hint": "/查日志 每个服务器最多显示最近多少条匹配日志，范围 1-20。"
+  },
+  "log_query_recent_days": {
+    "description": "查日志最近天数",
+    "type": "int",
+    "default": 7,
+    "hint": "/查日志 只扫描最近 N 天的日志文件，范围 1-365。"
+  },
   "from_date": {
     "description": "统计开始日期",
     "type": "string",

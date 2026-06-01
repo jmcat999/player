@@ -20,6 +20,10 @@ const (
 	queryTypePlayerKeyword = "playerKeyword"
 	defaultLogQueryPage    = 100
 	maxLogQueryPageSize    = 500
+	defaultPublicLogLimit  = 8
+	maxPublicLogLimit      = 20
+	defaultPublicLogDays   = 7
+	maxPublicLogDays       = 365
 )
 
 type LogQueryRequest struct {
@@ -84,6 +88,31 @@ type LogQueryView struct {
 	TotalPages    int           `json:"totalPages"`
 	FailedFiles   int           `json:"failedFiles"`
 	CurrentFile   string        `json:"currentFile"`
+	Message       string        `json:"message"`
+	Rows          []LogQueryRow `json:"rows"`
+}
+
+type PublicCoordinateLogQueryRequest struct {
+	ServerID string
+	X        float64
+	Y        float64
+	Z        float64
+	Limit    int
+	Days     int
+}
+
+type PublicCoordinateLogQueryView struct {
+	ServerID      string        `json:"serverId"`
+	ServerName    string        `json:"serverName"`
+	X             float64       `json:"x"`
+	Y             float64       `json:"y"`
+	Z             float64       `json:"z"`
+	Days          int           `json:"days"`
+	ScannedFiles  int           `json:"scannedFiles"`
+	ScannedRows   int64         `json:"scannedRows"`
+	MatchedRows   int64         `json:"matchedRows"`
+	DisplayedRows int           `json:"displayedRows"`
+	FailedFiles   int           `json:"failedFiles"`
 	Message       string        `json:"message"`
 	Rows          []LogQueryRow `json:"rows"`
 }
@@ -168,6 +197,102 @@ func (s *LogQueryService) Clear(ctx context.Context, serverID, queryType string)
 	delete(s.latest, key)
 	s.mu.Unlock()
 	return s.Latest(ctx, serverID, queryType, 1, defaultLogQueryPage)
+}
+
+func (s *LogQueryService) PublicCoordinate(ctx context.Context, request PublicCoordinateLogQueryRequest) (PublicCoordinateLogQueryView, error) {
+	serverID, err := requireLogQueryServer(request.ServerID)
+	if err != nil {
+		return PublicCoordinateLogQueryView{}, err
+	}
+	source, ok := s.importer.sourceByID(ctx, serverID)
+	if !ok {
+		return PublicCoordinateLogQueryView{}, auth.NewHTTPError(404, "找不到服务器："+serverID)
+	}
+	files, err := s.importer.localFiles(source)
+	if err != nil {
+		return PublicCoordinateLogQueryView{}, err
+	}
+	criteria := logQueryCriteria{
+		queryType: queryTypeCoordinate,
+		x1:        request.X,
+		y1:        request.Y,
+		z1:        request.Z,
+		x2:        request.X,
+		y2:        request.Y,
+		z2:        request.Z,
+	}
+	days := normalizePublicLogDays(request.Days)
+	cutoff := dateOnly(time.Now().In(s.importer.cfg.Location).AddDate(0, 0, -days+1), s.importer.cfg.Location)
+	result := PublicCoordinateLogQueryView{
+		ServerID:   source.ID,
+		ServerName: source.Name,
+		X:          request.X,
+		Y:          request.Y,
+		Z:          request.Z,
+		Days:       days,
+		Rows:       []LogQueryRow{},
+	}
+	for _, file := range files {
+		fileDate := extractLogDate(file.FileName, s.importer.cfg.Location)
+		if fileDate == nil || fileDate.Before(cutoff) {
+			continue
+		}
+		result.ScannedFiles++
+		if err := scanPublicCoordinateFile(file, criteria, &result); err != nil {
+			result.FailedFiles++
+		}
+	}
+	sort.Slice(result.Rows, func(i, j int) bool {
+		if result.Rows[i].Date != result.Rows[j].Date {
+			return result.Rows[i].Date > result.Rows[j].Date
+		}
+		if result.Rows[i].Time != result.Rows[j].Time {
+			return result.Rows[i].Time > result.Rows[j].Time
+		}
+		return result.Rows[i].LineNumber > result.Rows[j].LineNumber
+	})
+	limit := normalizePublicLogLimit(request.Limit)
+	if len(result.Rows) > limit {
+		result.Rows = result.Rows[:limit]
+	}
+	result.DisplayedRows = len(result.Rows)
+	switch {
+	case result.ScannedFiles == 0:
+		result.Message = "没有可查询的日志文件"
+	case result.MatchedRows == 0:
+		result.Message = "没有匹配到这个交互坐标的日志"
+	default:
+		result.Message = "匹配到 " + strconvI64(result.MatchedRows) + " 条日志，显示最近 " + strconvI64(int64(result.DisplayedRows)) + " 条"
+	}
+	return result, nil
+}
+
+func scanPublicCoordinateFile(file RemoteLogFile, criteria logQueryCriteria, result *PublicCoordinateLogQueryView) error {
+	opened, err := os.Open(file.Path)
+	if err != nil {
+		return err
+	}
+	defer opened.Close()
+	scanner := bufio.NewScanner(opened)
+	scanner.Buffer(make([]byte, 64*1024), 4*1024*1024)
+	var lineNumber int64
+	for scanner.Scan() {
+		lineNumber++
+		line := scanner.Text()
+		if strings.TrimSpace(line) == "" {
+			continue
+		}
+		columns := splitPrefix(line)
+		if isHeader(columns) {
+			continue
+		}
+		result.ScannedRows++
+		if criteria.matches(columns) {
+			result.MatchedRows++
+			result.Rows = append(result.Rows, logQueryRow(file, lineNumber, columns))
+		}
+	}
+	return scanner.Err()
 }
 
 func (s *LogQueryService) run(state *logQueryState, source configlessSource, key string) {
@@ -605,6 +730,26 @@ func normalizeLogPageSize(pageSize int) int {
 		return maxLogQueryPageSize
 	}
 	return pageSize
+}
+
+func normalizePublicLogLimit(limit int) int {
+	if limit <= 0 {
+		return defaultPublicLogLimit
+	}
+	if limit > maxPublicLogLimit {
+		return maxPublicLogLimit
+	}
+	return limit
+}
+
+func normalizePublicLogDays(days int) int {
+	if days <= 0 {
+		return defaultPublicLogDays
+	}
+	if days > maxPublicLogDays {
+		return maxPublicLogDays
+	}
+	return days
 }
 
 func apiLogDate(value *time.Time) *apitype.Date {

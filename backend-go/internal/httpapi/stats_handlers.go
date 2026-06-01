@@ -5,6 +5,7 @@ import (
 	"strconv"
 	"time"
 
+	"player-stats-backend-go/internal/importer"
 	"player-stats-backend-go/internal/stats"
 )
 
@@ -87,6 +88,30 @@ func (s *Server) statsPlayerPresence(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, response)
 }
 
+func (s *Server) publicCoordinateLogs(w http.ResponseWriter, r *http.Request) {
+	x, ok := queryFloat(w, r, "x")
+	if !ok {
+		return
+	}
+	y, ok := queryFloat(w, r, "y")
+	if !ok {
+		return
+	}
+	z, ok := queryFloat(w, r, "z")
+	if !ok {
+		return
+	}
+	response, err := s.logQueryService.PublicCoordinate(r.Context(), importer.PublicCoordinateLogQueryRequest{
+		ServerID: r.URL.Query().Get("serverId"),
+		X:        x,
+		Y:        y,
+		Z:        z,
+		Limit:    queryInt(r, "limit", 8),
+		Days:     queryInt(r, "days", 7),
+	})
+	s.writeHTTPErrorResult(w, http.StatusOK, response, err)
+}
+
 func (s *Server) statsDaily(w http.ResponseWriter, r *http.Request) {
 	from, to, ok := s.parseDateRange(w, r)
 	if !ok {
@@ -141,4 +166,18 @@ func queryInt(r *http.Request, key string, fallback int) int {
 		return fallback
 	}
 	return value
+}
+
+func queryFloat(w http.ResponseWriter, r *http.Request, key string) (float64, bool) {
+	raw := r.URL.Query().Get(key)
+	if raw == "" {
+		writeError(w, http.StatusBadRequest, key+" 不能为空")
+		return 0, false
+	}
+	value, err := strconv.ParseFloat(raw, 64)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, key+" 必须是数字")
+		return 0, false
+	}
+	return value, true
 }

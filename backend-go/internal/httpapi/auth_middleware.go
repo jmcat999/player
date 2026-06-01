@@ -37,6 +37,7 @@ func (s *Server) authMiddleware(next http.Handler) http.Handler {
 func (s *Server) isPluginStatsRequest(r *http.Request) bool {
 	return r.Method == http.MethodGet && (r.URL.Path == "/api/stats/player" ||
 		r.URL.Path == "/api/stats/player-presence" ||
+		r.URL.Path == "/api/stats/public-coordinate-logs" ||
 		r.URL.Path == "/api/stats/players")
 }
 

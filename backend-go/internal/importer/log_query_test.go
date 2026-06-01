@@ -78,3 +78,15 @@ func TestLogQueryPlayerKeywordDateIsFileScopedLikeJava(t *testing.T) {
 		t.Fatal("player keyword match re-applied row date; Java only filters the selected files by date")
 	}
 }
+
+func TestNormalizePublicLogDays(t *testing.T) {
+	if got := normalizePublicLogDays(0); got != defaultPublicLogDays {
+		t.Fatalf("normalizePublicLogDays(0) = %d, want %d", got, defaultPublicLogDays)
+	}
+	if got := normalizePublicLogDays(30); got != 30 {
+		t.Fatalf("normalizePublicLogDays(30) = %d, want 30", got)
+	}
+	if got := normalizePublicLogDays(maxPublicLogDays + 1); got != maxPublicLogDays {
+		t.Fatalf("normalizePublicLogDays(max+1) = %d, want %d", got, maxPublicLogDays)
+	}
+}
