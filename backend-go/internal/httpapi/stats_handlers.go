@@ -70,6 +70,23 @@ func (s *Server) statsPlayer(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, response)
 }
 
+func (s *Server) statsPlayerPresence(w http.ResponseWriter, r *http.Request) {
+	response, found, err := s.statsService.PlayerPresence(
+		r.Context(),
+		r.URL.Query().Get("serverId"),
+		r.URL.Query().Get("playerName"),
+	)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "服务器内部错误")
+		return
+	}
+	if !found {
+		writeError(w, http.StatusNotFound, "没有这个玩家信息")
+		return
+	}
+	writeJSON(w, http.StatusOK, response)
+}
+
 func (s *Server) statsDaily(w http.ResponseWriter, r *http.Request) {
 	from, to, ok := s.parseDateRange(w, r)
 	if !ok {

@@ -58,6 +58,18 @@ type ServerOption struct {
 	ServerName string `json:"serverName"`
 }
 
+type PlayerPresenceResponse struct {
+	PlayerName string                 `json:"playerName"`
+	Servers    []PlayerPresenceServer `json:"servers"`
+}
+
+type PlayerPresenceServer struct {
+	ServerID    string                 `json:"serverId"`
+	ServerName  string                 `json:"serverName"`
+	PlayerName  string                 `json:"playerName"`
+	FirstSeenAt *apitype.LocalDateTime `json:"firstSeenAt"`
+}
+
 type ImportedServerLogFileView struct {
 	ID           int64         `json:"id"`
 	ServerID     string        `json:"serverId"`
@@ -158,6 +170,52 @@ func (s *Service) Player(ctx context.Context, serverID, playerName string, from,
 		return s.singleServerPlayer(ctx, serverID, playerName, from, to)
 	}
 	return s.aggregatePlayer(ctx, playerName, from, to)
+}
+
+func (s *Service) PlayerPresence(ctx context.Context, serverID, playerName string) (PlayerPresenceResponse, bool, error) {
+	playerName = strings.TrimSpace(playerName)
+	if playerName == "" {
+		return PlayerPresenceResponse{}, false, nil
+	}
+	serverID = normalizeServerID(serverID)
+	query := `
+		select server_id, server_name, player_name, first_seen_at
+		from player_server_profiles
+		where player_name = ?`
+	args := []any{playerName}
+	if serverID != "" {
+		query += ` and server_id = ?`
+		args = append(args, serverID)
+	}
+	query += ` order by server_id`
+
+	rows, err := s.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return PlayerPresenceResponse{}, false, err
+	}
+	defer rows.Close()
+
+	response := PlayerPresenceResponse{Servers: []PlayerPresenceServer{}}
+	for rows.Next() {
+		var item PlayerPresenceServer
+		var firstSeenAt time.Time
+		if err := rows.Scan(&item.ServerID, &item.ServerName, &item.PlayerName, &firstSeenAt); err != nil {
+			return PlayerPresenceResponse{}, false, err
+		}
+		firstSeen := apitype.NewLocalDateTime(firstSeenAt)
+		item.FirstSeenAt = &firstSeen
+		if response.PlayerName == "" {
+			response.PlayerName = item.PlayerName
+		}
+		response.Servers = append(response.Servers, item)
+	}
+	if err := rows.Err(); err != nil {
+		return PlayerPresenceResponse{}, false, err
+	}
+	if len(response.Servers) == 0 {
+		return PlayerPresenceResponse{}, false, nil
+	}
+	return response, true, nil
 }
 
 func (s *Service) Daily(ctx context.Context, serverID string, from, to *time.Time, player string) ([]DailySummary, error) {

@@ -63,6 +63,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /api/stats/server-options", s.statsServerOptions)
 	s.mux.HandleFunc("GET /api/stats/players", s.statsPlayers)
 	s.mux.HandleFunc("GET /api/stats/player", s.statsPlayer)
+	s.mux.HandleFunc("GET /api/stats/player-presence", s.statsPlayerPresence)
 	s.mux.HandleFunc("GET /api/stats/daily", s.statsDaily)
 	s.mux.HandleFunc("GET /api/stats/imports", s.statsImports)
 

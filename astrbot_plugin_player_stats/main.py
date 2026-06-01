@@ -16,7 +16,7 @@ from astrbot.core.star.filter.command import GreedyStr
     "player_stats",
     "Codex",
     "查询 Minecraft 玩家在主服和 2服的方块统计",
-    "0.10.4",
+    "0.10.5",
 )
 class PlayerStatsPlugin(Star):
     SERVERS = (
@@ -182,71 +182,75 @@ class PlayerStatsPlugin(Star):
             return response.json()
 
     async def _check_player_exists(self, game_id: str) -> dict[str, Any]:
-        tasks = [self._fetch_player_presence(game_id, server_id) for server_id, _ in self.SERVERS]
-        results = await asyncio.gather(*tasks, return_exceptions=True)
+        try:
+            result = await self._fetch_player_presence(game_id)
+        except httpx.HTTPStatusError as ex:
+            if ex.response.status_code == 404:
+                return {
+                    "ok": False,
+                    "message": (
+                        f"绑定失败：没有这个玩家信息：{game_id}\n"
+                        "请确认大小写和游戏内名字是否正确，或等待日志导入后再绑定。"
+                    ),
+                }
+            logger.warning(f"check player presence api error: {ex.response.status_code} {ex.response.text}")
+            if ex.response.status_code == 401:
+                return {
+                    "ok": False,
+                    "message": "绑定失败：统计后端拒绝访问，请在 AstrBot 插件配置里填写插件密钥 api_key。",
+                }
+            return {
+                "ok": False,
+                "message": f"绑定失败：统计后端返回 {ex.response.status_code}。",
+            }
+        except httpx.ConnectError:
+            return {
+                "ok": False,
+                "message": "绑定失败：统计后端没有连接上，请稍后再试。",
+            }
+        except httpx.TimeoutException:
+            return {
+                "ok": False,
+                "message": "绑定失败：统计后端响应超时，请稍后再试。",
+            }
+        except Exception as ex:
+            logger.exception(f"check player exists failed: {ex}")
+            return {
+                "ok": False,
+                "message": "绑定失败：机器人插件内部错误，请看 AstrBot 日志。",
+            }
 
-        found_servers: list[str] = []
-        canonical_name = ""
-        for (server_id, server_name), result in zip(self.SERVERS, results, strict=True):
-            if isinstance(result, httpx.HTTPStatusError) and result.response.status_code == 404:
-                continue
-            if isinstance(result, httpx.ConnectError):
-                return {
-                    "ok": False,
-                    "message": "绑定失败：统计后端没有连接上，请稍后再试。",
-                }
-            if isinstance(result, httpx.TimeoutException):
-                return {
-                    "ok": False,
-                    "message": "绑定失败：统计后端响应超时，请稍后再试。",
-                }
-            if isinstance(result, httpx.HTTPStatusError):
-                logger.warning(f"check player api error: {result.response.status_code} {result.response.text}")
-                if result.response.status_code == 401:
-                    return {
-                        "ok": False,
-                        "message": "绑定失败：统计后端拒绝访问，请在 AstrBot 插件配置里填写插件密钥 api_key。",
-                    }
-                return {
-                    "ok": False,
-                    "message": f"绑定失败：统计后端返回 {result.response.status_code}。",
-                }
-            if isinstance(result, Exception):
-                logger.exception(f"check player exists failed on {server_id}: {result}")
-                return {
-                    "ok": False,
-                    "message": "绑定失败：机器人插件内部错误，请看 AstrBot 日志。",
-                }
-
-            found_servers.append(server_name)
-            if not canonical_name:
-                canonical_name = str(result.get("playerName") or "").strip()
-
+        servers = result.get("servers") or []
+        found_servers = [
+            str(server.get("serverName") or server.get("serverId") or "").strip()
+            for server in servers
+        ]
+        found_servers = [server for server in found_servers if server]
         if not found_servers:
             return {
                 "ok": False,
                 "message": (
-                    f"绑定失败：没有在主服或 2服找到玩家 ID：{game_id}\n"
+                    f"绑定失败：没有这个玩家信息：{game_id}\n"
                     "请确认大小写和游戏内名字是否正确，或等待日志导入后再绑定。"
                 ),
             }
+        canonical_name = str(result.get("playerName") or "").strip()
         return {
             "ok": True,
             "player_name": canonical_name or game_id,
             "servers": found_servers,
         }
 
-    async def _fetch_player_presence(self, game_id: str, server_id: str) -> dict[str, Any]:
+    async def _fetch_player_presence(self, game_id: str) -> dict[str, Any]:
         base_url = self._api_base_url()
         timeout_seconds = float(self.config.get("timeout_seconds", 8))
         params: dict[str, str] = {
-            "serverId": server_id,
             "playerName": game_id,
         }
 
         async with httpx.AsyncClient(timeout=timeout_seconds) as client:
             response = await client.get(
-                f"{base_url}/api/stats/player",
+                f"{base_url}/api/stats/player-presence",
                 params=params,
                 headers=self._auth_headers(),
             )
