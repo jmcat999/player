@@ -16,7 +16,7 @@ from astrbot.core.star.filter.command import GreedyStr
     "player_stats",
     "Codex",
     "查询 Minecraft 玩家在主服和 2服的方块统计",
-    "0.11.3",
+    "0.11.4",
 )
 class PlayerStatsPlugin(Star):
     SERVERS = (
@@ -113,11 +113,31 @@ class PlayerStatsPlugin(Star):
     @filter.command("查日志", alias={"坐标日志", "查坐标日志"})
     async def query_coordinate_logs(self, event: AstrMessageEvent, args: GreedyStr):
         """按指定服务器的交互坐标查询公开日志。例如 /查日志 主服 -191 -34 750。"""
-        parsed = self._parse_coordinate_log_args(str(args))
+        async for result in self._handle_coordinate_log_query(event, str(args)):
+            yield result
+
+    @filter.event_message_type(filter.EventMessageType.ALL)
+    async def query_coordinate_logs_without_prefix(self, event: AstrMessageEvent):
+        raw_args = self._bare_log_query_args(str(getattr(event, "message_str", "") or ""))
+        if raw_args is None:
+            return
+        event.stop_event()
+        async for result in self._handle_coordinate_log_query(event, raw_args):
+            yield result
+
+    async def _handle_coordinate_log_query(self, event: AstrMessageEvent, raw_args: str):
+        parsed = self._parse_coordinate_log_args(raw_args)
         if parsed is None:
             yield event.plain_result(self._log_query_usage_text())
             return
         target_server, coords = parsed
+        x, y, z = coords
+        days = self._public_log_recent_days()
+        coord_text = self._format_coord_triplet(x, y, z)
+        yield event.plain_result(
+            f"正在查询 {target_server['serverName']} 最近 {days} 天日志中，请稍等...\n"
+            f"交互坐标：{coord_text}"
+        )
 
         bound_game_id = await self.get_kv_data(self._binding_key(event), "")
         if not bound_game_id:
@@ -149,9 +169,11 @@ class PlayerStatsPlugin(Star):
             )
             return
 
-        x, y, z = coords
         limit = self._public_log_result_limit()
-        days = self._public_log_recent_days()
+        logger.info(
+            f"public coordinate log query started: player={presence['player_name']} "
+            f"server={server['serverId']} days={days} coord={coord_text}"
+        )
         try:
             result = await self._fetch_public_coordinate_logs(server["serverId"], x, y, z, limit, days)
         except Exception as ex:
@@ -159,8 +181,12 @@ class PlayerStatsPlugin(Star):
             yield event.plain_result(error or "查询失败：机器人插件内部错误，请看 AstrBot 日志。")
             return
 
+        logger.info(
+            f"public coordinate log query finished: player={presence['player_name']} "
+            f"server={server['serverId']} matched={int(result.get('matchedRows') or 0)}"
+        )
         lines = [
-            f"交互坐标日志：{self._format_coord_triplet(x, y, z)}",
+            f"交互坐标日志：{coord_text}",
             f"服务器：{server['serverName']}",
             f"绑定玩家：{presence['player_name']}",
             f"查询范围：最近 {days} 天",
@@ -409,7 +435,7 @@ class PlayerStatsPlugin(Star):
         self, server_id: str, x: float, y: float, z: float, limit: int, days: int
     ) -> dict[str, Any]:
         base_url = self._api_base_url()
-        timeout_seconds = float(self.config.get("timeout_seconds", 8))
+        timeout_seconds = self._public_log_timeout_seconds()
         params: dict[str, str] = {
             "serverId": server_id,
             "x": self._format_coord_value(x),
@@ -918,6 +944,17 @@ class PlayerStatsPlugin(Star):
             return None
         return server, coords
 
+    def _bare_log_query_args(self, message: str) -> str | None:
+        text = (message or "").strip()
+        if not text or text[0] in {"/", "!", "！", "#", "."}:
+            return None
+        for command in ("查日志", "坐标日志", "查坐标日志"):
+            if text == command:
+                return ""
+            if text.startswith(command) and text[len(command):len(command) + 1].isspace():
+                return text[len(command):].strip()
+        return None
+
     def _resolve_log_query_server(self, raw: str) -> dict[str, str] | None:
         value = (raw or "").strip().lower()
         aliases = self._log_query_server_aliases()
@@ -1012,6 +1049,12 @@ class PlayerStatsPlugin(Star):
             return max(1, min(int(self.config.get("log_query_recent_days", 7)), 365))
         except (TypeError, ValueError):
             return 7
+
+    def _public_log_timeout_seconds(self) -> float:
+        try:
+            return max(10.0, min(float(self.config.get("log_query_timeout_seconds", 60)), 300.0))
+        except (TypeError, ValueError):
+            return 60.0
 
     def _active_days(self) -> int:
         try:

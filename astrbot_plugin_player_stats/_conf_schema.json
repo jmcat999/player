@@ -82,6 +82,12 @@
     "default": 7,
     "hint": "/查日志 只扫描最近 N 天的日志文件，范围 1-365。"
   },
+  "log_query_timeout_seconds": {
+    "description": "查日志超时时间",
+    "type": "float",
+    "default": 60,
+    "hint": "/查日志 单次请求后端的超时时间，范围 10-300 秒。日志多时可以适当调大。"
+  },
   "log_query_main_aliases": {
     "description": "查日志主服别名",
     "type": "string",
