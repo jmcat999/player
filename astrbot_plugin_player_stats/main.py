@@ -16,7 +16,7 @@ from astrbot.core.star.filter.command import GreedyStr
     "player_stats",
     "Codex",
     "查询 Minecraft 玩家在主服和 2服的方块统计",
-    "0.11.5",
+    "0.11.6",
 )
 class PlayerStatsPlugin(Star):
     SERVERS = (
@@ -114,7 +114,6 @@ class PlayerStatsPlugin(Star):
     @filter.command("查日志", alias={"坐标日志", "查坐标日志"})
     async def query_coordinate_logs(self, event: AstrMessageEvent, args: GreedyStr):
         """按指定服务器的交互坐标查询公开日志。例如 /查日志 主服 -191 -34 750。"""
-        event.stop_event()
         async for result in self._handle_coordinate_log_query(event, str(args)):
             yield result
 
@@ -123,7 +122,6 @@ class PlayerStatsPlugin(Star):
         raw_args = self._bare_log_query_args(str(getattr(event, "message_str", "") or ""))
         if raw_args is None:
             return
-        event.stop_event()
         async for result in self._handle_coordinate_log_query(event, raw_args):
             yield result
 
@@ -196,7 +194,7 @@ class PlayerStatsPlugin(Star):
             f"服务器：{server['serverName']}",
             f"绑定玩家：{presence['player_name']}",
             f"查询范围：最近 {days} 天",
-            f"本小时剩余查询次数：{quota['remaining']}/{quota['limit']}",
+            f"1小时内剩余查询次数：{quota['remaining']}/{quota['limit']}",
             "",
             self._format_public_log_result(server, result),
         ]
