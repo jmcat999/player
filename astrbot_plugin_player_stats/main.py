@@ -16,7 +16,7 @@ from astrbot.core.star.filter.command import GreedyStr
     "player_stats",
     "Codex",
     "查询 Minecraft 玩家在主服和 2服的方块统计",
-    "0.11.4",
+    "0.11.5",
 )
 class PlayerStatsPlugin(Star):
     SERVERS = (
@@ -34,6 +34,7 @@ class PlayerStatsPlugin(Star):
         self._xray_group_task = None
         self._last_xray_ws_error = ""
         self._log_query_usage: dict[str, list[datetime]] = {}
+        self._recent_log_query_events: dict[str, datetime] = {}
         self._start_xray_group_task_if_needed()
 
     def _start_xray_group_task_if_needed(self):
@@ -113,6 +114,7 @@ class PlayerStatsPlugin(Star):
     @filter.command("查日志", alias={"坐标日志", "查坐标日志"})
     async def query_coordinate_logs(self, event: AstrMessageEvent, args: GreedyStr):
         """按指定服务器的交互坐标查询公开日志。例如 /查日志 主服 -191 -34 750。"""
+        event.stop_event()
         async for result in self._handle_coordinate_log_query(event, str(args)):
             yield result
 
@@ -131,6 +133,10 @@ class PlayerStatsPlugin(Star):
             yield event.plain_result(self._log_query_usage_text())
             return
         target_server, coords = parsed
+        dedupe_key = self._log_query_dedupe_key(event, target_server["serverId"], coords)
+        if self._is_duplicate_log_query(dedupe_key):
+            logger.debug(f"duplicate public coordinate log query ignored: {dedupe_key}")
+            return
         x, y, z = coords
         days = self._public_log_recent_days()
         coord_text = self._format_coord_triplet(x, y, z)
@@ -954,6 +960,25 @@ class PlayerStatsPlugin(Star):
             if text.startswith(command) and text[len(command):len(command) + 1].isspace():
                 return text[len(command):].strip()
         return None
+
+    def _log_query_dedupe_key(
+        self, event: AstrMessageEvent, server_id: str, coords: tuple[float, float, float]
+    ) -> str:
+        coord_part = ",".join(self._format_coord_value(value) for value in coords)
+        return f"{event.get_sender_id()}:{server_id}:{coord_part}"
+
+    def _is_duplicate_log_query(self, key: str) -> bool:
+        now = datetime.now(timezone.utc)
+        ttl = timedelta(seconds=15)
+        self._recent_log_query_events = {
+            cached_key: cached_at
+            for cached_key, cached_at in self._recent_log_query_events.items()
+            if now - cached_at <= ttl
+        }
+        if key in self._recent_log_query_events:
+            return True
+        self._recent_log_query_events[key] = now
+        return False
 
     def _resolve_log_query_server(self, raw: str) -> dict[str, str] | None:
         value = (raw or "").strip().lower()
