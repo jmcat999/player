@@ -2,7 +2,7 @@ name: player_stats
 display_name: 玩家日志统计
 author: Codex
 desc: 查询 Minecraft 玩家在主服和 2服的破坏、放置、首次记录时间和临时详情页。
-version: 0.11.8
+version: 0.11.9
 repo: ""
 support_platforms:
   - aiocqhttp

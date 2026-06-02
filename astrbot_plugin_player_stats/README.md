@@ -26,8 +26,9 @@ AstrBot 玩家统计插件，用来查询玩家方块统计。
 服务器名别名可在插件配置中修改，默认主服别名为 `主服,1服,一服,main`，2服别名为 `2服,二服,副服,sub`。
 这个坐标是玩家交互坐标，也就是被点击、破坏或放置的方块坐标，不是玩家站位坐标。
 使用前必须先绑定游戏 ID；插件会先检查绑定 ID 是否在目标服务器玩家档案中。每个绑定游戏 ID 每小时可查询次数由
-`log_query_hourly_limit` 配置，默认 5 次；只扫描最近 `log_query_recent_days` 天的日志，默认 7 天；目标服务器最多显示最近
-`log_query_result_limit` 条，默认 8 条；后端查询超时由 `log_query_timeout_seconds` 配置，默认 60 秒。
+`log_query_hourly_limit` 配置，默认 5 次；只扫描已同步本地日志中最近 `log_query_recent_days` 天的日志，默认 7 天；
+目标服务器最多显示最近 `log_query_result_limit` 条，默认 8 条；后端查询超时由 `log_query_timeout_seconds` 配置，默认 60 秒。
+查询结果会显示按本地日志文件推导出的具体日期范围，并提示最新日志通常在每天凌晨 0-1 点刷新。
 
 ```text
 详细足迹：http://10.0.0.2:8080/share/xxxx

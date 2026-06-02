@@ -16,7 +16,7 @@ from astrbot.core.star.filter.command import GreedyStr
     "player_stats",
     "Codex",
     "查询 Minecraft 玩家在主服和 2服的方块统计",
-    "0.11.8",
+    "0.11.9",
 )
 class PlayerStatsPlugin(Star):
     SERVERS = (
@@ -139,7 +139,7 @@ class PlayerStatsPlugin(Star):
         days = self._public_log_recent_days()
         coord_text = self._format_coord_triplet(x, y, z)
         yield event.plain_result(
-            f"正在查询 {target_server['serverName']} 最近 {days} 天日志中，请稍等...\n"
+            f"正在查询 {target_server['serverName']} 已同步的最近 {days} 天日志中，请稍等...\n"
             f"交互坐标：{coord_text}"
         )
 
@@ -193,10 +193,12 @@ class PlayerStatsPlugin(Star):
             f"交互坐标日志：{coord_text}",
             f"服务器：{server['serverName']}",
             f"查询者：{presence['player_name']}",
-            f"查询范围：最近 {days} 天",
+            f"查询范围：{self._format_public_log_date_range(result, days)}",
             f"1小时内剩余查询次数：{quota['remaining']}/{quota['limit']}",
             "",
             self._format_public_log_result(server, result),
+            "",
+            "提示：最新日志通常在每天凌晨 0-1 点刷新，查询结果以服务器已同步的本地日志为准。",
         ]
         yield event.plain_result("\n".join(lines))
 
@@ -917,6 +919,13 @@ class PlayerStatsPlugin(Star):
             coord = self._row_interaction_coord(row)
             lines.append(f"{index}. {when} {actor} {action} {detail} @ {coord}".strip())
         return "\n".join(lines)
+
+    def _format_public_log_date_range(self, data: dict[str, Any], days: int) -> str:
+        from_date = self._format_short_date(data.get("fromDate"))
+        to_date = self._format_short_date(data.get("toDate"))
+        if from_date != "-" and to_date != "-":
+            return f"{from_date} - {to_date}（按本地日志文件，最近 {days} 天）"
+        return f"已同步的最近 {days} 天本地日志"
 
     def _row_detail(self, row: dict[str, Any]) -> str:
         for key in ("detail1", "detail2"):

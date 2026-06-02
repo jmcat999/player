@@ -108,6 +108,8 @@ type PublicCoordinateLogQueryView struct {
 	Y             float64       `json:"y"`
 	Z             float64       `json:"z"`
 	Days          int           `json:"days"`
+	FromDate      *apitype.Date `json:"fromDate"`
+	ToDate        *apitype.Date `json:"toDate"`
 	ScannedFiles  int           `json:"scannedFiles"`
 	ScannedRows   int64         `json:"scannedRows"`
 	MatchedRows   int64         `json:"matchedRows"`
@@ -222,7 +224,7 @@ func (s *LogQueryService) PublicCoordinate(ctx context.Context, request PublicCo
 		z2:        request.Z,
 	}
 	days := normalizePublicLogDays(request.Days)
-	cutoff := dateOnly(time.Now().In(s.importer.cfg.Location).AddDate(0, 0, -days+1), s.importer.cfg.Location)
+	fromDate, toDate := publicLogDateRangeFromFiles(files, days, s.importer.cfg.Location)
 	result := PublicCoordinateLogQueryView{
 		ServerID:   source.ID,
 		ServerName: source.Name,
@@ -230,11 +232,13 @@ func (s *LogQueryService) PublicCoordinate(ctx context.Context, request PublicCo
 		Y:          request.Y,
 		Z:          request.Z,
 		Days:       days,
+		FromDate:   apiLogDate(fromDate),
+		ToDate:     apiLogDate(toDate),
 		Rows:       []LogQueryRow{},
 	}
 	for _, file := range files {
 		fileDate := extractLogDate(file.FileName, s.importer.cfg.Location)
-		if fileDate == nil || fileDate.Before(cutoff) {
+		if fromDate == nil || toDate == nil || fileDate == nil || fileDate.Before(*fromDate) || fileDate.After(*toDate) {
 			continue
 		}
 		result.ScannedFiles++
@@ -750,6 +754,28 @@ func normalizePublicLogDays(days int) int {
 		return maxPublicLogDays
 	}
 	return days
+}
+
+func publicLogDateRangeFromFiles(files []RemoteLogFile, days int, location *time.Location) (*time.Time, *time.Time) {
+	days = normalizePublicLogDays(days)
+	var latest *time.Time
+	for _, file := range files {
+		fileDate := extractLogDate(file.FileName, location)
+		if fileDate == nil {
+			continue
+		}
+		if latest == nil || fileDate.After(*latest) {
+			value := dateOnly(*fileDate, location)
+			latest = &value
+		}
+	}
+	if latest == nil {
+		return nil, nil
+	}
+	from := latest.AddDate(0, 0, -days+1)
+	from = dateOnly(from, location)
+	to := dateOnly(*latest, location)
+	return &from, &to
 }
 
 func apiLogDate(value *time.Time) *apitype.Date {

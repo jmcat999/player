@@ -90,3 +90,24 @@ func TestNormalizePublicLogDays(t *testing.T) {
 		t.Fatalf("normalizePublicLogDays(max+1) = %d, want %d", got, maxPublicLogDays)
 	}
 }
+
+func TestPublicLogDateRangeUsesLatestLocalLogFile(t *testing.T) {
+	location := time.FixedZone("CST", 8*60*60)
+	files := []RemoteLogFile{
+		{FileName: "player_actions_2026-05-20.csv"},
+		{FileName: "player_actions_latest.csv"},
+		{FileName: "player_actions_2026-05-29.csv"},
+		{FileName: "player_actions_2026-05-24.csv.tmp"},
+	}
+
+	from, to := publicLogDateRangeFromFiles(files, 7, location)
+	if from == nil || to == nil {
+		t.Fatal("range is nil, want latest local log based range")
+	}
+	if got, want := from.Format("2006-01-02"), "2026-05-23"; got != want {
+		t.Fatalf("from = %s, want %s", got, want)
+	}
+	if got, want := to.Format("2006-01-02"), "2026-05-29"; got != want {
+		t.Fatalf("to = %s, want %s", got, want)
+	}
+}
