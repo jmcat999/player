@@ -16,7 +16,7 @@ from astrbot.core.star.filter.command import GreedyStr
     "player_stats",
     "Codex",
     "查询 Minecraft 玩家在主服和 2服的方块统计",
-    "0.11.9",
+    "0.12.0",
 )
 class PlayerStatsPlugin(Star):
     SERVERS = (
@@ -115,14 +115,6 @@ class PlayerStatsPlugin(Star):
     async def query_coordinate_logs(self, event: AstrMessageEvent, args: GreedyStr):
         """按指定服务器的交互坐标查询公开日志。例如 /查日志 主服 -191 -34 750。"""
         async for result in self._handle_coordinate_log_query(event, str(args)):
-            yield result
-
-    @filter.event_message_type(filter.EventMessageType.ALL)
-    async def query_coordinate_logs_without_prefix(self, event: AstrMessageEvent):
-        raw_args = self._bare_log_query_args(str(getattr(event, "message_str", "") or ""))
-        if raw_args is None:
-            return
-        async for result in self._handle_coordinate_log_query(event, raw_args):
             yield result
 
     async def _handle_coordinate_log_query(self, event: AstrMessageEvent, raw_args: str):
@@ -957,17 +949,6 @@ class PlayerStatsPlugin(Star):
             return None
         return server, coords
 
-    def _bare_log_query_args(self, message: str) -> str | None:
-        text = (message or "").strip()
-        if not text or text[0] in {"/", "!", "！", "#", "."}:
-            return None
-        for command in ("查日志", "坐标日志", "查坐标日志"):
-            if text == command:
-                return ""
-            if text.startswith(command) and text[len(command):len(command) + 1].isspace():
-                return text[len(command):].strip()
-        return None
-
     def _log_query_dedupe_key(
         self, event: AstrMessageEvent, server_id: str, coords: tuple[float, float, float]
     ) -> str:
@@ -1030,7 +1011,6 @@ class PlayerStatsPlugin(Star):
             "用法：/查日志 服务器名 X Y Z\n"
             "示例：/查日志 主服 -191 -34 750\n"
             "示例：/查日志 2服 -191 -34 750\n"
-            "服务器名别名可在插件配置里修改。\n"
             "说明：查询的是交互坐标，也就是被点击、破坏或放置的方块坐标。"
         )
 
