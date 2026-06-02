@@ -280,6 +280,7 @@ func (s *Service) LatestAutoTaskLogs(ctx context.Context, limit int) ([]AutoTask
 			&item.SuccessFiles, &item.SkippedFiles, &item.FailedFiles); err != nil {
 			return nil, err
 		}
+		item.FileDetails = normalizeAutoTaskFileDetails(item.FileDetails)
 		result = append(result, item)
 	}
 	return result, rows.Err()

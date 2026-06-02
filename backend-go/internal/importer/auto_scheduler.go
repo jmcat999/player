@@ -2,7 +2,6 @@ package importer
 
 import (
 	"context"
-	"encoding/json"
 	"log/slog"
 	"sync"
 	"time"
@@ -119,10 +118,12 @@ func (s *AutoTaskScheduler) runSync(task settings.AutoTaskSetting, skipToday boo
 		return
 	}
 	message := label + " 完成"
+	status := "FINISHED"
 	if result.FailedFiles > 0 {
 		message = label + " 完成，但存在失败文件"
+		status = "FINISHED_WITH_ERRORS"
 	}
-	s.recordTask(ctx, task.ServerID, task.ServerName, "SYNC", label, "FINISHED", message, &result)
+	s.recordTask(ctx, task.ServerID, task.ServerName, "SYNC", label, status, message, &result)
 }
 
 func (s *AutoTaskScheduler) runImport(task settings.AutoTaskSetting, skipToday bool) {
@@ -135,10 +136,12 @@ func (s *AutoTaskScheduler) runImport(task settings.AutoTaskSetting, skipToday b
 		return
 	}
 	message := label + " 完成"
+	status := "FINISHED"
 	if result.FailedFiles > 0 {
 		message = label + " 完成，但存在失败文件"
+		status = "FINISHED_WITH_ERRORS"
 	}
-	s.recordTask(ctx, task.ServerID, task.ServerName, "IMPORT", label, "FINISHED", message, &result)
+	s.recordTask(ctx, task.ServerID, task.ServerName, "IMPORT", label, status, message, &result)
 }
 
 func (s *AutoTaskScheduler) recordConfig(ctx context.Context, message string) {
@@ -153,9 +156,7 @@ func (s *AutoTaskScheduler) recordTask(ctx context.Context, serverID, serverName
 		success = result.ImportedFiles
 		skipped = result.SkippedFiles
 		failed = result.FailedFiles
-		if payload, err := json.Marshal(result.Files); err == nil {
-			details = string(payload)
-		}
+		details = formatAutoTaskFileDetails(result.Files)
 	}
 	_, err := s.importer.db.ExecContext(ctx, `
 		insert into auto_task_logs (
