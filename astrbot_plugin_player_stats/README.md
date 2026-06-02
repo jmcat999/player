@@ -28,6 +28,13 @@ AstrBot 玩家统计插件，用来查询玩家方块统计。
 目标服务器最多显示最近 `log_query_result_limit` 条，默认 8 条；后端查询超时由 `log_query_timeout_seconds` 配置，默认 60 秒。
 查询结果会显示按本地日志文件推导出的具体日期范围，并提示最新日志通常在每天凌晨 0-1 点刷新。
 
+`log_query_mode` 控制查日志权限模式：
+
+```text
+绑定玩家：任何已绑定游戏 ID 的玩家可以查询，会检查绑定 ID 是否在目标服务器有资料。
+群管理员：只允许群聊管理员在群聊中查询，不要求绑定游戏 ID。
+```
+
 ```text
 详细足迹：http://10.0.0.2:8080/share/xxxx
 复制到浏览器打开，链接2小时内有效
@@ -44,7 +51,7 @@ enable_rankings = false
 enable_active_rankings = false
 ```
 
-Vue 后台的“矿透分析详情”页面可以提交“发送到Q群”任务。插件配置好 `enable_xray_group_send`
+网页后台的“矿透分析详情”页面可以提交“发送到群”任务。插件配置好 `enable_xray_group_send`
 和 `xray_group_id` 后，会把风险提示发送到指定群，详情链接使用同一个 `share_base_url`：
 
 ```text
@@ -96,9 +103,9 @@ http://服务器IP:9493
 
 这个入口只开放玩家详情和插件必要接口，不暴露管理后台。如果 AstrBot 走本机或内网访问后端，但详情链接要发给群友打开，就把 `api_base_url` 填本机/内网地址，把 `share_base_url` 填群友能访问的地址。
 
-`api_key` 填 Vue 管理后台“系统设置”里的 `AstrBot 插件密钥`。
+`api_key` 填网页管理后台“系统设置”里的机器人插件密钥。
 
-详情链接有效期在 Vue 管理后台“系统设置”的“分享链接有效期（分钟）”里调整，AstrBot 会读取后端返回的有效期并显示正确文案。
+详情链接有效期在网页管理后台“系统设置”的“分享链接有效期（分钟）”里调整，机器人插件会读取后端返回的有效期并显示正确文案。
 
 矿透分析群发送需要在 AstrBot 插件配置中设置：
 
@@ -123,15 +130,15 @@ xray_group_id = 123456789
 这个检查不使用 `from_date` / `to_date` 过滤，避免老玩家因为当前统计日期范围太窄而无法绑定。
 
 
-## WebSocket group sending
+## 长连接群发送
 
-`enable_xray_group_ws = true` is enabled by default. When Vue creates a Send to QQ group task, the plugin receives it through WebSocket first. If WebSocket disconnects or the backend is temporarily unreachable, the plugin retries the WebSocket connection. Already-created tasks stay in the backend memory queue for up to 10 minutes and are sent after reconnect.
+`enable_xray_group_ws = true` 默认开启。网页后台创建“发送到群”任务后，插件会优先通过长连接接收任务。如果长连接断开，插件只会自动重连；已经创建的待发送任务保存在后端内存队列里，最多保留 10 分钟，重连后继续发送。
 
-If AstrBot runs in Docker, do not set `api_base_url` to `http://127.0.0.1:9493` unless the backend is in the same container. Use the backend service name, host LAN IP, or another address reachable from the AstrBot container, for example:
+如果机器人运行在 Docker 里，除非后端和机器人在同一个容器，否则不要把 `api_base_url` 填成 `http://127.0.0.1:9493`。应该填写机器人容器能访问到的后端服务名、宿主机局域网地址或其他可达地址，例如：
 
 ```text
 http://player-backend:8080
 http://HOST_LAN_IP:9493
 ```
 
-Do not append `/api` or a trailing slash to the backend address.
+后端地址不要加接口路径，也不要以斜杠结尾。

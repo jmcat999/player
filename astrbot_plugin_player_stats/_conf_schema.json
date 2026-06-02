@@ -3,37 +3,37 @@
     "description": "接口服务地址",
     "type": "string",
     "default": "http://127.0.0.1:9493",
-    "hint": "机器人请求后端接口用的地址，例如 http://127.0.0.1:9493 或 http://后端内网IP:9493。不要加 /api，不要以 / 结尾。"
+    "hint": "机器人请求后端接口用的地址，可以填写本机地址或后端内网地址。不要加接口路径，不要以斜杠结尾。"
   },
   "share_base_url": {
     "description": "分享链接",
     "type": "string",
     "default": "http://127.0.0.1:9493",
-    "hint": "发到群里的详细足迹链接使用这个地址，例如 http://服务器IP:9493 或公网域名。不要加 /api，不要以 / 结尾；手机或电脑必须能访问。"
+    "hint": "发到群里的详细足迹链接使用这个地址，可以填写玩家能访问的公网域名或服务器地址。不要加接口路径，不要以斜杠结尾。"
   },
   "api_key": {
     "description": "插件密钥",
     "type": "string",
     "default": "",
-    "hint": "登录 Vue 管理后台，在系统设置里复制 AstrBot 插件密钥。"
+    "hint": "登录网页管理后台，在系统设置里复制机器人插件密钥。"
   },
   "enable_xray_group_send": {
     "description": "启用矿透分析群发送",
     "type": "bool",
     "default": false,
-    "hint": "开启后，Vue 矿透分析详情页点击“发送到Q群”会由 AstrBot 自动发送风险提示到配置的群。"
+    "hint": "开启后，网页管理后台的矿透分析详情页点击“发送到群”会由机器人自动发送风险提示到配置的群。"
   },
   "xray_group_id": {
     "description": "矿透分析发送群号",
     "type": "string",
     "default": "",
-    "hint": "填写要接收矿透风险提示的 QQ 群号。插件会优先通过 OneBot/aiocqhttp 直发；高级用法也可以填写完整 unified_msg_origin。"
+    "hint": "填写要接收矿透风险提示的群号。插件会优先通过机器人平台接口直发；高级用法也可以填写完整会话来源标识。"
   },
   "enable_xray_group_ws": {
-    "description": "Enable WebSocket xray group sending",
+    "description": "启用矿透分析长连接群发送",
     "type": "bool",
     "default": true,
-    "hint": "Use WebSocket push. If disconnected, the plugin reconnects; in-memory pending tasks are sent after reconnect and expire after 10 minutes."
+    "hint": "开启后优先通过长连接接收群发送任务。连接断开时插件会自动重连；待发送任务保存在后端内存中，10 分钟后过期。"
   },
   "timeout_seconds": {
     "description": "请求超时时间（秒）",
@@ -70,6 +70,12 @@
     "default": 5,
     "hint": "每个绑定游戏 ID 在 1 小时内最多使用 /查日志 的次数，范围 1-60。"
   },
+  "log_query_mode": {
+    "description": "查日志权限模式",
+    "type": "string",
+    "default": "绑定玩家",
+    "hint": "可填：绑定玩家、群管理员。绑定玩家模式要求用户先绑定游戏 ID；群管理员模式仅允许群聊管理员查询，不要求绑定游戏 ID。"
+  },
   "log_query_result_limit": {
     "description": "查日志返回条数",
     "type": "int",
@@ -104,12 +110,12 @@
     "description": "统计开始日期",
     "type": "string",
     "default": "",
-    "hint": "可选，格式 YYYY-MM-DD。留空表示最早。"
+    "hint": "可选，格式为年-月-日。留空表示最早。"
   },
   "to_date": {
     "description": "统计结束日期",
     "type": "string",
     "default": "",
-    "hint": "可选，格式 YYYY-MM-DD。留空表示最新。"
+    "hint": "可选，格式为年-月-日。留空表示最新。"
   }
 }

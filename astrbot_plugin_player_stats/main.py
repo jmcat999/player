@@ -16,7 +16,7 @@ from astrbot.core.star.filter.command import GreedyStr
     "player_stats",
     "Codex",
     "查询 Minecraft 玩家在主服和 2服的方块统计",
-    "0.12.0",
+    "0.12.1",
 )
 class PlayerStatsPlugin(Star):
     SERVERS = (
@@ -135,39 +135,52 @@ class PlayerStatsPlugin(Star):
             f"交互坐标：{coord_text}"
         )
 
-        bound_game_id = await self.get_kv_data(self._binding_key(event), "")
-        if not bound_game_id:
-            yield event.plain_result(
-                "请先绑定游戏 ID 后再查询日志。\n"
-                "绑定示例：/绑定游戏id Steve\n"
-                f"{self._log_query_usage_text()}"
-            )
-            return
+        mode = self._log_query_mode()
+        quota: dict[str, Any] | None = None
+        if mode == "admin_group":
+            if not self._is_group_message(event):
+                yield event.plain_result("查询失败：当前模式仅允许群聊管理员在群聊中使用 /查日志。")
+                return
+            if not self._is_group_admin(event):
+                yield event.plain_result("查询失败：当前模式仅允许群聊管理员使用 /查日志。")
+                return
+            server = target_server
+            query_actor = self._event_sender_label(event)
+        else:
+            bound_game_id = await self.get_kv_data(self._binding_key(event), "")
+            if not bound_game_id:
+                yield event.plain_result(
+                    "请先绑定游戏 ID 后再查询日志。\n"
+                    "绑定示例：/绑定游戏id Steve\n"
+                    f"{self._log_query_usage_text()}"
+                )
+                return
 
-        presence = await self._query_bound_player_presence(bound_game_id)
-        if not presence["ok"]:
-            yield event.plain_result(presence["message"])
-            return
-        server = self._find_presence_server(presence["servers"], target_server["serverId"])
-        if server is None:
-            yield event.plain_result(
-                f"查询失败：绑定的游戏 ID 在 {target_server['serverName']} 没有玩家信息。\n"
-                "请确认服务器名是否正确，或等待数据更新后再尝试查询。"
-                "(数据每天凌晨0~1点自动更新)"
-            )
-            return
+            presence = await self._query_bound_player_presence(bound_game_id)
+            if not presence["ok"]:
+                yield event.plain_result(presence["message"])
+                return
+            server = self._find_presence_server(presence["servers"], target_server["serverId"])
+            if server is None:
+                yield event.plain_result(
+                    f"查询失败：绑定的游戏 ID 在 {target_server['serverName']} 没有玩家信息。\n"
+                    "请确认服务器名是否正确，或等待数据更新后再尝试查询。"
+                    "(数据每天凌晨0~1点自动更新)"
+                )
+                return
 
-        quota = self._consume_log_query_quota(presence["player_name"])
-        if not quota["ok"]:
-            yield event.plain_result(
-                f"查询次数已用完：每个玩家 1 小时内最多查询 {quota['limit']} 次。\n"
-                f"请约 {quota['reset_minutes']} 分钟后再试。"
-            )
-            return
+            quota = self._consume_log_query_quota(presence["player_name"])
+            if not quota["ok"]:
+                yield event.plain_result(
+                    f"查询次数已用完：每个玩家 1 小时内最多查询 {quota['limit']} 次。\n"
+                    f"请约 {quota['reset_minutes']} 分钟后再试。"
+                )
+                return
+            query_actor = presence["player_name"]
 
         limit = self._public_log_result_limit()
         logger.info(
-            f"public coordinate log query started: player={presence['player_name']} "
+            f"public coordinate log query started: actor={query_actor} mode={mode} "
             f"server={server['serverId']} days={days} coord={coord_text}"
         )
         try:
@@ -178,20 +191,23 @@ class PlayerStatsPlugin(Star):
             return
 
         logger.info(
-            f"public coordinate log query finished: player={presence['player_name']} "
+            f"public coordinate log query finished: actor={query_actor} mode={mode} "
             f"server={server['serverId']} matched={int(result.get('matchedRows') or 0)}"
         )
         lines = [
             f"交互坐标日志：{coord_text}",
             f"服务器：{server['serverName']}",
-            f"查询者：{presence['player_name']}",
+            f"查询者：{query_actor}",
             f"查询范围：{self._format_public_log_date_range(result, days)}",
-            f"1小时内剩余查询次数：{quota['remaining']}/{quota['limit']}",
+        ]
+        if quota is not None:
+            lines.append(f"1小时内剩余查询次数：{quota['remaining']}/{quota['limit']}")
+        lines.extend([
             "",
             self._format_public_log_result(server, result),
             "",
             "提示：最新日志通常在每天凌晨 0-1 点刷新，查询结果以服务器已同步的本地日志为准。",
-        ]
+        ])
         yield event.plain_result("\n".join(lines))
 
     async def _query_and_format_all(self, game_id: str) -> str:
@@ -967,6 +983,132 @@ class PlayerStatsPlugin(Star):
             return True
         self._recent_log_query_events[key] = now
         return False
+
+    def _log_query_mode(self) -> str:
+        raw = str(self.config.get("log_query_mode", "绑定玩家")).strip().lower()
+        if raw in {"群管理员", "qq群管理员", "仅群管理员", "仅qq群管理员", "管理员", "admin", "group_admin"}:
+            return "admin_group"
+        return "bound_player"
+
+    def _is_group_message(self, event: AstrMessageEvent) -> bool:
+        return bool(self._event_group_id(event))
+
+    def _is_group_admin(self, event: AstrMessageEvent) -> bool:
+        if not self._is_group_message(event):
+            return False
+        event_role = str(getattr(event, "role", "") or "").strip().lower()
+        if event_role == "admin":
+            return True
+        is_admin = getattr(event, "is_admin", None)
+        if callable(is_admin):
+            try:
+                return bool(is_admin())
+            except Exception as ex:
+                logger.debug(f"check AstrBot event admin failed: {ex}")
+        for role in self._event_sender_roles(event):
+            if role in {"owner", "admin", "administrator", "群主", "管理员"}:
+                return True
+        for value in self._event_sender_flag_values(event):
+            text = str(value).strip().lower()
+            if text in {"true", "1", "yes", "owner", "admin", "administrator"}:
+                return True
+        return False
+
+    def _event_group_id(self, event: AstrMessageEvent) -> str:
+        get_group_id = getattr(event, "get_group_id", None)
+        if callable(get_group_id):
+            try:
+                group_id = str(get_group_id() or "").strip()
+                if group_id:
+                    return group_id
+            except Exception as ex:
+                logger.debug(f"get AstrBot group id failed: {ex}")
+        for value in self._event_nested_values(event, ("group_id", "groupId", "group", "channel_id", "guild_id")):
+            text = str(value or "").strip()
+            if text:
+                return text
+        return ""
+
+    def _event_sender_label(self, event: AstrMessageEvent) -> str:
+        get_sender_name = getattr(event, "get_sender_name", None)
+        if callable(get_sender_name):
+            try:
+                sender_name = str(get_sender_name() or "").strip()
+                if sender_name:
+                    return sender_name
+            except Exception as ex:
+                logger.debug(f"get AstrBot sender name failed: {ex}")
+        for value in self._event_values_from_sources(
+            self._event_sender_sources(event),
+            ("nickname", "card", "name", "user_name", "username"),
+        ):
+            text = str(value or "").strip()
+            if text:
+                return text
+        return str(event.get_sender_id() or "").strip() or "未知用户"
+
+    def _event_sender_roles(self, event: AstrMessageEvent) -> set[str]:
+        roles: set[str] = set()
+        for value in self._event_values_from_sources(
+            self._event_sender_sources(event),
+            ("role", "permission", "user_role", "member_role"),
+        ):
+            text = str(value or "").strip().lower()
+            if text:
+                roles.add(text)
+        return roles
+
+    def _event_sender_flag_values(self, event: AstrMessageEvent) -> list[Any]:
+        return self._event_values_from_sources(
+            self._event_sender_sources(event),
+            ("is_admin", "admin", "is_owner", "owner"),
+        )
+
+    def _event_sender_sources(self, event: AstrMessageEvent) -> list[Any]:
+        message_obj = getattr(event, "message_obj", None)
+        raw_message = getattr(message_obj, "raw_message", None)
+        return [
+            getattr(message_obj, "sender", None),
+            self._dict_child(raw_message, "sender"),
+            self._dict_child(raw_message, "member"),
+            self._dict_child(raw_message, "author"),
+            self._dict_child(raw_message, "user"),
+            raw_message,
+            event,
+        ]
+
+    def _event_nested_values(self, event: AstrMessageEvent, keys: tuple[str, ...]) -> list[Any]:
+        message_obj = getattr(event, "message_obj", None)
+        return self._event_values_from_sources([event, message_obj, getattr(message_obj, "raw_message", None)], keys)
+
+    def _event_values_from_sources(self, sources: list[Any], keys: tuple[str, ...]) -> list[Any]:
+        values: list[Any] = []
+        seen: set[int] = set()
+
+        for source in sources:
+            if source is None:
+                continue
+            marker = id(source)
+            if marker in seen:
+                continue
+            seen.add(marker)
+            if isinstance(source, dict):
+                for key in keys:
+                    if key in source:
+                        values.append(source.get(key))
+                continue
+            for key in keys:
+                if hasattr(source, key):
+                    try:
+                        values.append(getattr(source, key))
+                    except Exception:
+                        pass
+        return values
+
+    def _dict_child(self, value: Any, key: str) -> Any:
+        if isinstance(value, dict):
+            return value.get(key)
+        return None
 
     def _resolve_log_query_server(self, raw: str) -> dict[str, str] | None:
         value = (raw or "").strip().lower()
