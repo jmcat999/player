@@ -1839,18 +1839,19 @@ th {
   }
 
   .log-detail-backdrop {
-    align-items: end;
-    place-items: end stretch;
+    align-items: stretch;
+    place-items: stretch;
     padding: 0;
   }
 
   .log-detail-panel {
     width: 100%;
-    max-height: 88vh;
-    border-radius: 12px 12px 0 0;
-    border-right: 0;
-    border-bottom: 0;
-    border-left: 0;
+    height: 100vh;
+    height: 100dvh;
+    max-height: none;
+    border: 0;
+    border-radius: 0;
+    overflow: auto;
   }
 
   .log-detail-grid {
@@ -1860,6 +1861,11 @@ th {
   .log-detail-panel .modal-actions {
     align-items: stretch;
     flex-direction: column;
+    position: sticky;
+    bottom: -20px;
+    margin: 0 -20px -20px;
+    padding: 12px 20px 20px;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.86), #fff 26%);
   }
 }
 
