@@ -82,6 +82,18 @@
     "default": 7,
     "hint": "/查日志 只扫描最近 N 天的日志文件，范围 1-365。"
   },
+  "log_query_main_aliases": {
+    "description": "查日志主服别名",
+    "type": "string",
+    "default": "主服,1服,一服,main",
+    "hint": "/查日志 命令里用于匹配主服的服务器名，多个别名用逗号分隔。"
+  },
+  "log_query_sub_aliases": {
+    "description": "查日志2服别名",
+    "type": "string",
+    "default": "2服,二服,副服,sub",
+    "hint": "/查日志 命令里用于匹配 2服 的服务器名，多个别名用逗号分隔。"
+  },
   "from_date": {
     "description": "统计开始日期",
     "type": "string",

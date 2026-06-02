@@ -16,13 +16,17 @@ from astrbot.core.star.filter.command import GreedyStr
     "player_stats",
     "Codex",
     "查询 Minecraft 玩家在主服和 2服的方块统计",
-    "0.11.1",
+    "0.11.2",
 )
 class PlayerStatsPlugin(Star):
     SERVERS = (
         ("main", "主服"),
         ("sub", "2服"),
     )
+    DEFAULT_LOG_QUERY_SERVER_ALIASES = {
+        "main": "主服,1服,一服,main",
+        "sub": "2服,二服,副服,sub",
+    }
 
     def __init__(self, context: Context, config: AstrBotConfig):
         super().__init__(context)
@@ -899,23 +903,31 @@ class PlayerStatsPlugin(Star):
 
     def _resolve_log_query_server(self, raw: str) -> dict[str, str] | None:
         value = (raw or "").strip().lower()
-        aliases = {
-            "main": "main",
-            "主服": "main",
-            "一服": "main",
-            "1服": "main",
-            "server1": "main",
-            "sub": "sub",
-            "2服": "sub",
-            "二服": "sub",
-            "副服": "sub",
-            "server2": "sub",
-        }
-        server_id = aliases.get(value, value)
+        aliases = self._log_query_server_aliases()
         for known_id, known_name in self.SERVERS:
-            if server_id == known_id.lower() or value == known_name.lower():
+            if value == known_id.lower() or value == known_name.lower() or value in aliases.get(known_id, set()):
                 return {"serverId": known_id, "serverName": known_name}
         return None
+
+    def _log_query_server_aliases(self) -> dict[str, set[str]]:
+        aliases: dict[str, set[str]] = {}
+        for server_id, server_name in self.SERVERS:
+            config_key = f"log_query_{server_id}_aliases"
+            default_value = self.DEFAULT_LOG_QUERY_SERVER_ALIASES.get(server_id, server_name)
+            values = self._split_alias_config(self.config.get(config_key, default_value))
+            values.update({server_id.lower(), server_name.lower()})
+            aliases[server_id] = values
+        return aliases
+
+    def _split_alias_config(self, raw: Any) -> set[str]:
+        if isinstance(raw, (list, tuple, set)):
+            parts = [str(item) for item in raw]
+        else:
+            text = str(raw or "")
+            for separator in ("，", "、", "|", ";", "；", "/", "\n", "\t", " "):
+                text = text.replace(separator, ",")
+            parts = text.split(",")
+        return {part.strip().lower() for part in parts if part.strip()}
 
     def _find_presence_server(self, servers: list[dict[str, str]], server_id: str) -> dict[str, str] | None:
         for server in servers:
@@ -932,6 +944,7 @@ class PlayerStatsPlugin(Star):
             "用法：/查日志 服务器名 X Y Z\n"
             "示例：/查日志 主服 -191 -34 750\n"
             "示例：/查日志 2服 -191 -34 750\n"
+            "服务器名别名可在插件配置里修改。\n"
             "说明：查询的是交互坐标，也就是被点击、破坏或放置的方块坐标。"
         )
 
