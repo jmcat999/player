@@ -16,7 +16,7 @@ from astrbot.core.star.filter.command import GreedyStr
     "player_stats",
     "Codex",
     "查询 Minecraft 玩家在主服和 2服的方块统计",
-    "0.11.2",
+    "0.11.3",
 )
 class PlayerStatsPlugin(Star):
     SERVERS = (
@@ -34,10 +34,27 @@ class PlayerStatsPlugin(Star):
         self._xray_group_task = None
         self._last_xray_ws_error = ""
         self._log_query_usage: dict[str, list[datetime]] = {}
+        self._start_xray_group_task_if_needed()
+
+    def _start_xray_group_task_if_needed(self):
+        if not self._config_bool("enable_xray_group_send", False):
+            return
+        if not self._xray_group_target():
+            logger.warning("xray group sender is enabled but xray_group_id is empty; background sender not started")
+            return
         try:
             self._xray_group_task = asyncio.create_task(self._xray_group_sender_loop())
+            self._xray_group_task.add_done_callback(self._on_xray_group_task_done)
         except RuntimeError as ex:
             logger.warning(f"start xray group sender loop failed: {ex}")
+
+    def _on_xray_group_task_done(self, task: asyncio.Task):
+        if task.cancelled():
+            return
+        try:
+            task.result()
+        except Exception as ex:
+            logger.warning(f"xray group sender stopped unexpectedly: {ex}")
 
     @filter.command("绑定游戏id", alias={"绑定游戏ID", "绑定id", "绑定ID"})
     async def bind_game_id(self, event: AstrMessageEvent, game_id: GreedyStr):
