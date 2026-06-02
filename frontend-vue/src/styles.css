@@ -1012,6 +1012,10 @@ h2 {
   overflow-x: auto;
 }
 
+.log-query-table {
+  min-width: 1380px;
+}
+
 table {
   width: 100%;
   border-collapse: collapse;
@@ -1053,6 +1057,20 @@ th {
   max-width: 360px;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.clickable-row {
+  cursor: pointer;
+}
+
+.clickable-row:hover td,
+.clickable-row:focus-visible td {
+  background: #f8fafc;
+}
+
+.clickable-row:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: -2px;
 }
 
 .risk-pill {
@@ -1346,6 +1364,83 @@ th {
   color: #637083;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.log-query-card-list {
+  display: none;
+}
+
+.log-detail-backdrop {
+  z-index: 42;
+}
+
+.log-detail-panel {
+  width: min(100%, 860px);
+  max-height: min(86vh, 760px);
+  overflow: auto;
+}
+
+.log-detail-panel h2 {
+  margin: 0;
+  font-size: 22px;
+  line-height: 1.2;
+}
+
+.log-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.log-detail-field {
+  min-width: 0;
+  display: grid;
+  gap: 5px;
+  padding: 11px 12px;
+  border: 1px solid #e2eaf3;
+  border-radius: 7px;
+  background: #f8fafc;
+}
+
+.log-detail-field span,
+.log-detail-block h3 {
+  color: #637083;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.log-detail-field strong {
+  min-width: 0;
+  color: #17202a;
+  font-size: 15px;
+  line-height: 1.45;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.log-detail-block {
+  display: grid;
+  gap: 8px;
+}
+
+.log-detail-block h3 {
+  margin: 0;
+}
+
+.log-detail-block pre {
+  max-height: 260px;
+  overflow: auto;
+  margin: 0;
+  padding: 12px;
+  border: 1px solid #e2eaf3;
+  border-radius: 7px;
+  background: #fbfcfe;
+  color: #17202a;
+  font-family: inherit;
+  font-size: 15px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 
 .file-detail-cell {
@@ -1676,6 +1771,95 @@ th {
 
   .auto-task-row {
     grid-template-columns: 1fr;
+  }
+
+  .log-query-table-wrap {
+    display: none;
+  }
+
+  .log-query-card-list {
+    display: grid;
+    gap: 10px;
+  }
+
+  .log-query-card {
+    width: 100%;
+    min-width: 0;
+    display: grid;
+    gap: 8px;
+    padding: 12px;
+    border: 1px solid #dbe4ee;
+    border-radius: 7px;
+    background: #fff;
+    color: #17202a;
+    text-align: left;
+    cursor: pointer;
+  }
+
+  .log-query-card:focus-visible {
+    outline: 2px solid #2563eb;
+    outline-offset: 2px;
+  }
+
+  .log-query-card-head {
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+  }
+
+  .log-query-card-head strong,
+  .log-query-card-player,
+  .log-query-card-coord,
+  .log-query-card-detail {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .log-query-card-head span,
+  .log-query-card-coord {
+    color: #637083;
+    font-size: 13px;
+    font-weight: 800;
+  }
+
+  .log-query-card-player {
+    font-weight: 900;
+  }
+
+  .log-query-card-detail {
+    color: #637083;
+  }
+
+  .log-query-card-empty {
+    margin: 0;
+  }
+
+  .log-detail-backdrop {
+    align-items: end;
+    place-items: end stretch;
+    padding: 0;
+  }
+
+  .log-detail-panel {
+    width: 100%;
+    max-height: 88vh;
+    border-radius: 12px 12px 0 0;
+    border-right: 0;
+    border-bottom: 0;
+    border-left: 0;
+  }
+
+  .log-detail-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .log-detail-panel .modal-actions {
+    align-items: stretch;
+    flex-direction: column;
   }
 }
 

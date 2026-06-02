@@ -10,6 +10,7 @@ import {
   ChevronRight,
   CheckCircle2,
   CircleSlash,
+  Copy,
   Crosshair,
   Database,
   Download,
@@ -149,6 +150,7 @@ const logQueryLoading = ref({})
 const xrayAnalysisLoading = ref({})
 const logQueryPages = ref({})
 const logQueryPageSizes = ref({})
+const selectedLogQueryRow = ref(null)
 let logQueryTimer = null
 
 const selectedServerName = computed(() => {
@@ -1010,6 +1012,7 @@ async function clearLogQuery(serverId) {
       const result = await apiDelete('/api/import/xray-analysis-jobs/latest', { serverId })
       xrayAnalysisResults.value = { ...xrayAnalysisResults.value, [key]: result }
     } else {
+      closeLogQueryRowDetail()
       const result = await apiDelete('/api/import/log-query-jobs/latest', { serverId, queryType })
       logQueryPages.value = { ...logQueryPages.value, [key]: 1 }
       logQueryResults.value = { ...logQueryResults.value, [key]: result }
@@ -1201,6 +1204,52 @@ function setLogQueryPageSize(pageSize) {
   logQueryPageSizes.value = { ...logQueryPageSizes.value, [key]: safePageSize }
   logQueryPages.value = { ...logQueryPages.value, [key]: 1 }
   loadLogQueryState(logQueryServerId.value)
+}
+
+function openLogQueryRowDetail(row) {
+  selectedLogQueryRow.value = row
+}
+
+function closeLogQueryRowDetail() {
+  selectedLogQueryRow.value = null
+}
+
+function logQueryRowFieldText(value) {
+  const text = String(value ?? '').trim()
+  return text || '-'
+}
+
+function logQueryRowDetailFields(row = selectedLogQueryRow.value) {
+  if (!row) return []
+  return [
+    ['文件', row.fileName || fileNameFromPath(row.filePath)],
+    ['行号', row.lineNumber],
+    ['时间', [row.date, row.time].filter(Boolean).join(' ')],
+    ['玩家', row.playerName],
+    ['行为', row.action],
+    ['玩家坐标', logQueryCoordinateText(row.x, row.y, row.z, row.dimension)],
+    ['交互坐标', logQueryCoordinateText(row.x2, row.y2, row.z2, row.dimension2)],
+    ['文件路径', row.filePath]
+  ].map(([label, value]) => ({ label, value: logQueryRowFieldText(value) }))
+}
+
+function logQueryRowDetailText(row = selectedLogQueryRow.value) {
+  if (!row) return ''
+  const lines = logQueryRowDetailFields(row).map((field) => `${field.label}：${field.value}`)
+  lines.push(`详细1：${logQueryRowFieldText(row.detail1)}`)
+  lines.push(`详细2：${logQueryRowFieldText(row.detail2)}`)
+  return lines.join('\n')
+}
+
+async function copyLogQueryRowDetail() {
+  const text = logQueryRowDetailText()
+  if (!text) return
+  try {
+    await navigator.clipboard.writeText(text)
+    importMessage.value = '日志详情已复制'
+  } catch (err) {
+    error.value = '复制失败，请手动选中文本复制'
+  }
 }
 
 function scrollLogQueryToTop() {
@@ -3659,8 +3708,8 @@ function toggleAllImportFileSelection(checked) {
             </button>
           </div>
         </div>
-        <div class="table-wrap">
-          <table>
+        <div class="table-wrap log-query-table-wrap">
+          <table class="log-query-table">
             <thead>
               <tr>
                 <th>文件</th>
@@ -3675,7 +3724,15 @@ function toggleAllImportFileSelection(checked) {
               </tr>
             </thead>
             <tbody>
-              <tr v-for="row in selectedLogQueryRows" :key="`${row.filePath}:${row.lineNumber}`">
+              <tr
+                v-for="row in selectedLogQueryRows"
+                :key="`${row.filePath}:${row.lineNumber}`"
+                class="clickable-row"
+                tabindex="0"
+                @click="openLogQueryRowDetail(row)"
+                @keydown.enter.prevent="openLogQueryRowDetail(row)"
+                @keydown.space.prevent="openLogQueryRowDetail(row)"
+              >
                 <td class="path-cell" :title="row.filePath">{{ row.fileName }}</td>
                 <td>{{ row.lineNumber }}</td>
                 <td>{{ row.date }} {{ row.time }}</td>
@@ -3693,6 +3750,26 @@ function toggleAllImportFileSelection(checked) {
               </tr>
             </tbody>
           </table>
+        </div>
+        <div class="log-query-card-list">
+          <button
+            v-for="row in selectedLogQueryRows"
+            :key="`${row.filePath}:${row.lineNumber}:card`"
+            class="log-query-card"
+            type="button"
+            @click="openLogQueryRowDetail(row)"
+          >
+            <span class="log-query-card-head">
+              <strong>{{ row.date }} {{ row.time }}</strong>
+              <span>{{ row.action || '-' }}</span>
+            </span>
+            <span class="log-query-card-player">{{ row.playerName || '-' }}</span>
+            <span class="log-query-card-coord">交互：{{ logQueryCoordinateText(row.x2, row.y2, row.z2, row.dimension2) }}</span>
+            <span class="log-query-card-detail">{{ row.detail1 || row.detail2 || '-' }}</span>
+          </button>
+          <p v-if="!selectedLogQueryRows.length" class="empty log-query-card-empty">
+            {{ selectedLogQueryRunning ? '正在查询，请稍等' : (selectedLogQueryResult?.message || '还没有查询记录') }}
+          </p>
         </div>
         <div class="table-toolbar bottom-toolbar">
           <span>
@@ -3731,6 +3808,44 @@ function toggleAllImportFileSelection(checked) {
         </div>
         </template>
       </article>
+
+      <div v-if="selectedLogQueryRow" class="modal-backdrop log-detail-backdrop" @click.self="closeLogQueryRowDetail">
+        <article class="modal-panel log-detail-panel">
+          <div class="modal-title">
+            <div>
+              <p class="eyebrow">日志详情</p>
+              <h2>{{ selectedLogQueryRow.action || '当前行' }}</h2>
+            </div>
+            <button class="icon-button ghost" type="button" title="关闭" @click="closeLogQueryRowDetail">
+              <XCircle :size="18" />
+            </button>
+          </div>
+
+          <div class="log-detail-grid">
+            <div v-for="field in logQueryRowDetailFields()" :key="field.label" class="log-detail-field">
+              <span>{{ field.label }}</span>
+              <strong>{{ field.value }}</strong>
+            </div>
+          </div>
+
+          <section class="log-detail-block">
+            <h3>详细1</h3>
+            <pre>{{ logQueryRowFieldText(selectedLogQueryRow.detail1) }}</pre>
+          </section>
+          <section class="log-detail-block">
+            <h3>详细2</h3>
+            <pre>{{ logQueryRowFieldText(selectedLogQueryRow.detail2) }}</pre>
+          </section>
+
+          <div class="modal-actions">
+            <button class="secondary-button" type="button" @click="copyLogQueryRowDetail">
+              <Copy :size="18" />
+              <span>复制详情</span>
+            </button>
+            <button class="primary-button" type="button" @click="closeLogQueryRowDetail">关闭</button>
+          </div>
+        </article>
+      </div>
     </section>
 
     <section v-else-if="currentView === 'xrayDetailPage'" class="result-page xray-detail-page">
