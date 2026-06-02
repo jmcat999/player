@@ -16,7 +16,7 @@ from astrbot.core.star.filter.command import GreedyStr
     "player_stats",
     "Codex",
     "查询 Minecraft 玩家在主服和 2服的方块统计",
-    "0.12.1",
+    "0.12.2",
 )
 class PlayerStatsPlugin(Star):
     SERVERS = (
@@ -118,6 +118,11 @@ class PlayerStatsPlugin(Star):
             yield result
 
     async def _handle_coordinate_log_query(self, event: AstrMessageEvent, raw_args: str):
+        mode = self._log_query_mode()
+        if mode == "admin_group" and not self._can_use_admin_log_query(event):
+            yield event.plain_result("没有权限：当前模式仅允许群聊管理员在群聊中使用 /查日志。")
+            return
+
         parsed = self._parse_coordinate_log_args(raw_args)
         if parsed is None:
             yield event.plain_result(self._log_query_usage_text())
@@ -135,15 +140,8 @@ class PlayerStatsPlugin(Star):
             f"交互坐标：{coord_text}"
         )
 
-        mode = self._log_query_mode()
         quota: dict[str, Any] | None = None
         if mode == "admin_group":
-            if not self._is_group_message(event):
-                yield event.plain_result("查询失败：当前模式仅允许群聊管理员在群聊中使用 /查日志。")
-                return
-            if not self._is_group_admin(event):
-                yield event.plain_result("查询失败：当前模式仅允许群聊管理员使用 /查日志。")
-                return
             server = target_server
             query_actor = self._event_sender_label(event)
         else:
@@ -992,6 +990,9 @@ class PlayerStatsPlugin(Star):
 
     def _is_group_message(self, event: AstrMessageEvent) -> bool:
         return bool(self._event_group_id(event))
+
+    def _can_use_admin_log_query(self, event: AstrMessageEvent) -> bool:
+        return self._is_group_message(event) and self._is_group_admin(event)
 
     def _is_group_admin(self, event: AstrMessageEvent) -> bool:
         if not self._is_group_message(event):
