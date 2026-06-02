@@ -16,7 +16,7 @@ from astrbot.core.star.filter.command import GreedyStr
     "player_stats",
     "Codex",
     "查询 Minecraft 玩家在主服和 2服的方块统计",
-    "0.11.0",
+    "0.11.1",
 )
 class PlayerStatsPlugin(Star):
     SERVERS = (
@@ -91,11 +91,12 @@ class PlayerStatsPlugin(Star):
 
     @filter.command("查日志", alias={"坐标日志", "查坐标日志"})
     async def query_coordinate_logs(self, event: AstrMessageEvent, args: GreedyStr):
-        """按交互坐标查询公开日志。例如 /查日志 -191 -34 750。"""
-        coords = self._parse_coordinate_args(str(args))
-        if coords is None:
+        """按指定服务器的交互坐标查询公开日志。例如 /查日志 主服 -191 -34 750。"""
+        parsed = self._parse_coordinate_log_args(str(args))
+        if parsed is None:
             yield event.plain_result(self._log_query_usage_text())
             return
+        target_server, coords = parsed
 
         bound_game_id = await self.get_kv_data(self._binding_key(event), "")
         if not bound_game_id:
@@ -110,6 +111,14 @@ class PlayerStatsPlugin(Star):
         if not presence["ok"]:
             yield event.plain_result(presence["message"])
             return
+        server = self._find_presence_server(presence["servers"], target_server["serverId"])
+        if server is None:
+            yield event.plain_result(
+                f"查询失败：绑定的游戏 ID 在 {target_server['serverName']} 没有玩家信息。\n"
+                "请确认服务器名是否正确，或等待数据更新后再尝试查询。"
+                "(数据每天凌晨0~1点自动更新)"
+            )
+            return
 
         quota = self._consume_log_query_quota(presence["player_name"])
         if not quota["ok"]:
@@ -122,25 +131,22 @@ class PlayerStatsPlugin(Star):
         x, y, z = coords
         limit = self._public_log_result_limit()
         days = self._public_log_recent_days()
-        servers = [server for server in presence["servers"] if server.get("serverId")]
-        tasks = [
-            self._fetch_public_coordinate_logs(server["serverId"], x, y, z, limit, days)
-            for server in servers
-        ]
-        results = await asyncio.gather(*tasks, return_exceptions=True)
-        error = self._first_error_message(list(results))
-        if error:
-            yield event.plain_result(error)
+        try:
+            result = await self._fetch_public_coordinate_logs(server["serverId"], x, y, z, limit, days)
+        except Exception as ex:
+            error = self._first_error_message([ex])
+            yield event.plain_result(error or "查询失败：机器人插件内部错误，请看 AstrBot 日志。")
             return
 
         lines = [
             f"交互坐标日志：{self._format_coord_triplet(x, y, z)}",
+            f"服务器：{server['serverName']}",
             f"绑定玩家：{presence['player_name']}",
             f"查询范围：最近 {days} 天",
             f"本小时剩余查询次数：{quota['remaining']}/{quota['limit']}",
+            "",
+            self._format_public_log_result(server, result),
         ]
-        for server, result in zip(servers, results, strict=True):
-            lines.extend(["", self._format_public_log_result(server, result)])
         yield event.plain_result("\n".join(lines))
 
     async def _query_and_format_all(self, game_id: str) -> str:
@@ -877,20 +883,55 @@ class PlayerStatsPlugin(Star):
             return f"{x}, {y}, {z} · {dimension}"
         return f"{x}, {y}, {z}"
 
-    def _parse_coordinate_args(self, raw: str) -> tuple[float, float, float] | None:
+    def _parse_coordinate_log_args(self, raw: str) -> tuple[dict[str, str], tuple[float, float, float]] | None:
         normalized = (raw or "").replace(",", " ").replace("，", " ").strip()
         parts = [part for part in normalized.split() if part]
-        if len(parts) != 3:
+        if len(parts) != 4:
+            return None
+        server = self._resolve_log_query_server(parts[0])
+        if server is None:
             return None
         try:
-            return (float(parts[0]), float(parts[1]), float(parts[2]))
+            coords = (float(parts[1]), float(parts[2]), float(parts[3]))
         except ValueError:
             return None
+        return server, coords
+
+    def _resolve_log_query_server(self, raw: str) -> dict[str, str] | None:
+        value = (raw or "").strip().lower()
+        aliases = {
+            "main": "main",
+            "主服": "main",
+            "一服": "main",
+            "1服": "main",
+            "server1": "main",
+            "sub": "sub",
+            "2服": "sub",
+            "二服": "sub",
+            "副服": "sub",
+            "server2": "sub",
+        }
+        server_id = aliases.get(value, value)
+        for known_id, known_name in self.SERVERS:
+            if server_id == known_id.lower() or value == known_name.lower():
+                return {"serverId": known_id, "serverName": known_name}
+        return None
+
+    def _find_presence_server(self, servers: list[dict[str, str]], server_id: str) -> dict[str, str] | None:
+        for server in servers:
+            if str(server.get("serverId") or "").strip().lower() == server_id.lower():
+                fallback_name = dict(self.SERVERS).get(server_id, server_id)
+                return {
+                    "serverId": server_id,
+                    "serverName": str(server.get("serverName") or fallback_name).strip(),
+                }
+        return None
 
     def _log_query_usage_text(self) -> str:
         return (
-            "用法：/查日志 X Y Z\n"
-            "示例：/查日志 -191 -34 750\n"
+            "用法：/查日志 服务器名 X Y Z\n"
+            "示例：/查日志 主服 -191 -34 750\n"
+            "示例：/查日志 2服 -191 -34 750\n"
             "说明：查询的是交互坐标，也就是被点击、破坏或放置的方块坐标。"
         )
 
