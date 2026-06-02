@@ -519,6 +519,10 @@ h2 {
   gap: 10px;
 }
 
+.actions {
+  flex-wrap: wrap;
+}
+
 .admin-badge {
   min-height: 40px;
   display: inline-flex;
@@ -621,6 +625,7 @@ h2 {
 .primary-button,
 .secondary-button,
 .icon-button {
+  min-width: 0;
   min-height: 40px;
   border: 1px solid transparent;
   border-radius: 8px;
@@ -679,6 +684,14 @@ h2 {
 .secondary-button:hover,
 .icon-button:hover {
   transform: translateY(-1px);
+}
+
+.primary-button span,
+.secondary-button span,
+.admin-badge span,
+.toggle-label span {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .filters {
@@ -937,6 +950,12 @@ h2 {
   margin-bottom: 14px;
 }
 
+.panel-title h2,
+.panel-title span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
 .bulk-actions {
   display: flex;
   flex-wrap: wrap;
@@ -1010,9 +1029,15 @@ h2 {
 .table-wrap {
   width: 100%;
   overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-gutter: stable;
 }
 
-.log-query-table {
+.table-wrap table {
+  min-width: 640px;
+}
+
+.table-wrap .log-query-table {
   min-width: 1380px;
 }
 
@@ -1021,11 +1046,11 @@ table {
   border-collapse: collapse;
 }
 
-.xray-table {
+.table-wrap .xray-table {
   min-width: 760px;
 }
 
-.xray-ore-position-table {
+.table-wrap .xray-ore-position-table {
   min-width: 820px;
 }
 
@@ -1664,11 +1689,20 @@ th {
 
   .actions {
     width: 100%;
-    justify-content: flex-end;
+    justify-content: flex-start;
   }
 
   .auto-task-row {
     grid-template-columns: minmax(0, 1fr) minmax(140px, 0.8fr);
+  }
+
+  .xray-detail-header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .xray-detail-actions {
+    justify-content: flex-start;
   }
 }
 
@@ -1732,15 +1766,38 @@ th {
   }
 
   .app-shell {
-    width: min(100% - 20px, 520px);
-    padding-top: 20px;
+    width: min(100% - 16px, 520px);
+    padding: 14px 0 28px;
   }
 
   h1 {
     font-size: 25px;
   }
 
-  .actions,
+  .topbar {
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+
+  .actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: stretch;
+    gap: 8px;
+  }
+
+  .actions > .admin-badge,
+  .actions > .server-time-badge,
+  .actions > .primary-button,
+  .actions > .secondary-button,
+  .actions > .toggle-label {
+    grid-column: 1 / -1;
+  }
+
+  .actions > .icon-button {
+    width: 100%;
+  }
+
   .admin-badge,
   .server-time-badge,
   .primary-button,
@@ -1750,10 +1807,119 @@ th {
     width: 100%;
   }
 
+  .admin-badge,
+  .server-time-badge,
+  .primary-button,
+  .secondary-button,
+  .toggle-label {
+    justify-content: center;
+    text-align: center;
+  }
+
+  .server-tabs {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .server-tabs button {
+    width: 100%;
+    justify-content: center;
+    padding: 0 10px;
+  }
+
+  .filters {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 10px;
+    padding: 12px;
+  }
+
   .filters input,
   .search-box {
     width: 100%;
     min-width: 0;
+  }
+
+  .log-feature-tabs {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .log-feature-tabs button {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .panel {
+    padding: 14px;
+  }
+
+  .panel.wide {
+    min-height: 0;
+  }
+
+  .panel-title {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .bulk-actions {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .bulk-check,
+  .bulk-actions .table-action {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .table-wrap {
+    margin: 0 -14px;
+    padding: 0 14px 2px;
+  }
+
+  th,
+  td {
+    padding: 10px 8px;
+  }
+
+  .path-cell {
+    max-width: 220px;
+  }
+
+  .message-cell,
+  .file-detail-cell {
+    max-width: 260px;
+  }
+
+  .table-toolbar {
+    display: grid;
+    grid-template-columns: 1fr;
+    align-items: start;
+    gap: 8px;
+  }
+
+  .pagination-controls {
+    width: 100%;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 42px 42px;
+    gap: 8px;
+  }
+
+  .pagination-controls label {
+    min-width: 0;
+  }
+
+  .pagination-controls select {
+    width: 100%;
+  }
+
+  .pagination-controls .secondary-button {
+    grid-column: 1 / -1;
   }
 
   .mini-button,
@@ -1767,10 +1933,73 @@ th {
 
   .metric-card {
     min-height: 112px;
+    padding: 14px;
+  }
+
+  .metric-card strong {
+    font-size: 26px;
   }
 
   .auto-task-row {
     grid-template-columns: 1fr;
+  }
+
+  .rank-row,
+  .trend-row,
+  .import-row {
+    gap: 8px;
+  }
+
+  .rank-row {
+    grid-template-columns: minmax(0, 1fr) 74px;
+  }
+
+  .rank-bar {
+    grid-column: 1 / -1;
+    order: 3;
+  }
+
+  .trend-row {
+    grid-template-columns: 46px minmax(0, 1fr) 64px;
+  }
+
+  .modal-backdrop {
+    padding: 10px;
+  }
+
+  .modal-panel {
+    width: 100%;
+    max-height: calc(100vh - 20px);
+    max-height: calc(100dvh - 20px);
+    overflow: auto;
+    padding: 16px;
+  }
+
+  .modal-title,
+  .modal-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .modal-actions button {
+    width: 100%;
+  }
+
+  .xray-detail-header {
+    padding: 14px;
+  }
+
+  .xray-detail-body {
+    padding: 14px;
+  }
+
+  .xray-detail-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .xray-detail-actions .primary-button,
+  .xray-detail-actions .secondary-button {
+    width: 100%;
   }
 
   .log-query-table-wrap {
@@ -1995,7 +2224,45 @@ th {
 }
 
 @media (max-width: 560px) {
+  .settings-grid {
+    gap: 1rem;
+  }
+
   .settings-form {
     grid-template-columns: 1fr;
+    padding: 0.75rem 0;
+  }
+
+  .profile-form {
+    max-width: none;
+  }
+
+  .settings-actions,
+  .settings-actions button {
+    width: 100%;
+  }
+
+  .settings-actions {
+    flex-direction: column;
+  }
+
+  .source-file-list {
+    margin: 0 -14px;
+    padding: 0 14px 1rem;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .toggle-label {
+    min-height: 40px;
+    padding: 0 12px;
+    border: 1px solid #d9e2ec;
+    border-radius: 8px;
+    background: #fff;
+    color: #475467;
+    white-space: normal;
+  }
+
+  .toggle-label span {
+    overflow-wrap: anywhere;
   }
 }
