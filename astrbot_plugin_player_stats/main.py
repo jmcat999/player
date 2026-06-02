@@ -16,7 +16,7 @@ from astrbot.core.star.filter.command import GreedyStr
     "player_stats",
     "Codex",
     "查询 Minecraft 玩家在主服和 2服的方块统计",
-    "0.11.6",
+    "0.11.7",
 )
 class PlayerStatsPlugin(Star):
     SERVERS = (
@@ -192,7 +192,7 @@ class PlayerStatsPlugin(Star):
         lines = [
             f"交互坐标日志：{coord_text}",
             f"服务器：{server['serverName']}",
-            f"绑定玩家：{presence['player_name']}",
+            f"查询玩家：{presence['player_name']}",
             f"查询范围：最近 {days} 天",
             f"1小时内剩余查询次数：{quota['remaining']}/{quota['limit']}",
             "",
