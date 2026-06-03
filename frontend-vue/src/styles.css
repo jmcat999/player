@@ -2099,6 +2099,48 @@ th {
 }
 
 /* Settings page */
+.settings-maintenance-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 12px;
+}
+
+.settings-maintenance-card {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid #e5edf5;
+  border-radius: 8px;
+  background: #fbfcfe;
+}
+
+.settings-maintenance-card > div:first-child {
+  display: grid;
+  gap: 4px;
+}
+
+.settings-maintenance-card strong {
+  color: #17202a;
+  font-size: 16px;
+}
+
+.settings-maintenance-card span {
+  color: #637083;
+  font-weight: 800;
+}
+
+.settings-maintenance-actions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.settings-maintenance-actions .secondary-button {
+  min-height: 38px;
+  padding: 0 10px;
+  font-size: 13px;
+}
+
 .settings-grid {
   display: flex;
   flex-direction: column;
@@ -2224,6 +2266,22 @@ th {
 }
 
 @media (max-width: 560px) {
+  .settings-maintenance-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .settings-maintenance-card {
+    padding: 12px;
+  }
+
+  .settings-maintenance-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .settings-maintenance-actions .secondary-button {
+    width: 100%;
+  }
+
   .settings-grid {
     gap: 1rem;
   }
