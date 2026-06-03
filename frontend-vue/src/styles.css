@@ -2109,11 +2109,9 @@ th {
 }
 
 .data-maintenance-card {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 14px;
-  padding: 12px 14px;
+  display: grid;
+  gap: 10px;
+  padding: 14px;
   border: 1px solid #e5edf5;
   border-radius: 8px;
   background: #fbfcfe;
@@ -2122,7 +2120,6 @@ th {
 .data-maintenance-card > div:first-child {
   display: grid;
   gap: 4px;
-  min-width: 72px;
 }
 
 .data-maintenance-card strong {
@@ -2133,7 +2130,7 @@ th {
 .data-maintenance-actions {
   display: flex;
   flex-wrap: wrap;
-  justify-content: flex-end;
+  justify-content: flex-start;
   gap: 8px;
 }
 
@@ -2271,7 +2268,6 @@ th {
 
 @media (max-width: 560px) {
   .data-maintenance-card {
-    display: grid;
     gap: 10px;
     padding: 12px;
   }
