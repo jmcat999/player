@@ -277,6 +277,10 @@ const xrayShareOrePositionOffset = computed(() => (clampPage(xrayShareOrePositio
 const xrayDetailOrePositionOffset = computed(() => (clampPage(xrayDetailOrePositionPage.value, xrayDetailOrePositionTotalPages.value) - 1) * xrayDetailOrePositionPageSize.value)
 const xrayDetailResult = computed(() => xrayAnalysisResultFor(logQueryServerId.value) || null)
 const selectedLogQueryRunning = computed(() => isActiveJob(selectedLogFeatureResult.value))
+const selectedLogFeatureHasResult = computed(() => {
+  const status = selectedLogFeatureResult.value?.status
+  return Boolean(status && String(status).toUpperCase() !== 'IDLE')
+})
 const selectedLogQueryLoading = computed(() => (
   logQueryMode.value === LOG_QUERY_TYPE_XRAY
     ? Boolean(xrayAnalysisLoading.value[logQueryStateKey(logQueryServerId.value, LOG_QUERY_TYPE_XRAY)])
@@ -3431,7 +3435,7 @@ function toggleAllImportFileSelection(checked) {
       </article>
     </section>
 
-    <section v-else-if="currentView === 'logQueryPage'" class="result-page">
+    <section v-else-if="currentView === 'logQueryPage'" class="result-page log-query-page">
       <div class="topbar">
         <div>
           <p class="eyebrow">PlayerLogger</p>
@@ -3613,7 +3617,7 @@ function toggleAllImportFileSelection(checked) {
         </form>
       </article>
 
-      <section class="result-summary-grid">
+      <section v-if="selectedLogFeatureHasResult" class="result-summary-grid">
         <article class="metric-card compact">
           <div class="metric-icon blue"><FileText :size="20" /></div>
           <p>扫描文件</p>
@@ -3636,7 +3640,7 @@ function toggleAllImportFileSelection(checked) {
         </article>
       </section>
 
-      <article class="panel wide">
+      <article v-if="selectedLogFeatureHasResult" class="panel wide">
         <div class="panel-title">
           <h2>{{ logQueryMode === LOG_QUERY_TYPE_XRAY ? '分析结果' : '查询结果' }}</h2>
           <span>{{ selectedLogFeatureResult?.message || '还没有查询记录' }}</span>

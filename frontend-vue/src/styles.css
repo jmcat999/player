@@ -2414,6 +2414,32 @@ th {
     order: 20;
   }
 
+  .log-query-page .actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-start;
+  }
+
+  .log-query-page .actions > .server-time-badge,
+  .log-query-page .actions > .admin-badge {
+    flex: 1 1 calc(50% - 4px);
+    width: auto;
+    justify-content: center;
+  }
+
+  .log-query-page .actions > .secondary-button {
+    flex: 0 0 auto;
+    width: auto;
+    min-height: 38px;
+    padding: 0 14px;
+  }
+
+  .log-query-page .actions > .icon-button {
+    flex: 0 0 42px;
+    width: 42px;
+  }
+
   .server-tabs {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(92px, 1fr));
@@ -2538,6 +2564,7 @@ th {
   }
 
   .log-feature-tabs button {
+    width: auto;
     flex: 0 0 auto;
     min-width: 116px;
     min-height: 38px;
