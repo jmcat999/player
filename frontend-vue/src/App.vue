@@ -329,13 +329,6 @@ const allEligibleSelected = computed(() => {
   const files = eligibleImportFiles.value
   return files.length > 0 && files.every((file) => selectedResetKeys.value.has(importFileKey(file)))
 })
-const syncNavLabel = computed(() => syncJobRunning.value
-  ? `查看复制状态 ${selectedServerName.value}`
-  : `前往复制 CSV ${selectedServerName.value}`)
-const importNavLabel = computed(() => importJobRunning.value
-  ? `查看解析状态 ${selectedServerName.value}`
-  : `前往解析 ${selectedServerName.value}`)
-
 onMounted(() => {
   if (openSharePageFromPath()) {
     return
@@ -550,14 +543,16 @@ async function runImport() {
   await startImportJob()
 }
 
-async function openImportPage() {
-  if (filters.value.serverId === 'all') {
+async function openImportPage(serverId = filters.value.serverId) {
+  const targetServerId = serverId && serverId !== 'all' ? serverId : filters.value.serverId
+  if (targetServerId === 'all') {
     error.value = '请先选择主服或 2服，再解析 CSV'
     currentView.value = 'dashboard'
     window.location.hash = ''
     return
   }
 
+  filters.value.serverId = targetServerId
   currentView.value = 'importPage'
   window.location.hash = '#/import'
   stopImportJobPolling()
@@ -721,14 +716,16 @@ async function deleteSelectedImportRecords() {
   }
 }
 
-async function openSyncPage() {
-  if (filters.value.serverId === 'all') {
+async function openSyncPage(serverId = filters.value.serverId) {
+  const targetServerId = serverId && serverId !== 'all' ? serverId : filters.value.serverId
+  if (targetServerId === 'all') {
     error.value = '请先选择主服或 2服，再复制 CSV'
     currentView.value = 'dashboard'
     window.location.hash = ''
     return
   }
 
+  filters.value.serverId = targetServerId
   currentView.value = 'syncPage'
   window.location.hash = '#/sync'
   stopSyncJobPolling()
@@ -1735,7 +1732,7 @@ function showOperationResult(type, result) {
   window.location.hash = type === 'import' ? '#/import-result' : '#/sync-result'
 }
 
-function goDashboard() {
+async function goDashboard() {
   stopImportJobPolling()
   stopSyncJobPolling()
   stopLogQueryPolling()
@@ -1743,6 +1740,7 @@ function goDashboard() {
   syncingFiles.value = false
   currentView.value = 'dashboard'
   window.location.hash = ''
+  await loadAll()
 }
 
 function handleApiError(err) {
@@ -2836,6 +2834,31 @@ function toggleAllImportFileSelection(checked) {
       <p v-if="importMessage" class="notice success">{{ importMessage }}</p>
 
       <div v-if="syncConfig" class="settings-grid">
+        <article class="panel wide">
+          <div class="panel-title">
+            <h2>数据维护</h2>
+            <span>手动复制和解析 CSV</span>
+          </div>
+          <div class="data-maintenance-grid">
+            <div v-for="server in serverOptions" :key="server.serverId" class="data-maintenance-card">
+              <div>
+                <strong>{{ server.serverName }}</strong>
+                <span>{{ formatNumber(sourceStat(server.serverId, 'totalCount')) }} 次方块行为</span>
+              </div>
+              <div class="data-maintenance-actions">
+                <button class="primary-button" type="button" @click="openSyncPage(server.serverId)">
+                  <Download :size="17" />
+                  <span>复制 CSV</span>
+                </button>
+                <button class="secondary-button" type="button" @click="openImportPage(server.serverId)">
+                  <Database :size="17" />
+                  <span>解析入库</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </article>
+
         <article class="panel wide">
           <div class="panel-title"><h2>SMB 服务器连接（只读）</h2></div>
           <div class="settings-form">
@@ -4259,14 +4282,6 @@ function toggleAllImportFileSelection(checked) {
         </button>
         <button class="icon-button ghost" type="button" title="刷新" :disabled="loading" @click="loadAll">
           <RefreshCw :size="18" :class="{ spin: loading }" />
-        </button>
-        <button v-if="filters.serverId !== 'all'" class="primary-button" type="button" @click="openSyncPage">
-          <Download :size="18" />
-          <span>{{ syncNavLabel }}</span>
-        </button>
-        <button v-if="filters.serverId !== 'all'" class="secondary-button" type="button" @click="openImportPage">
-          <Database :size="18" />
-          <span>{{ importNavLabel }}</span>
         </button>
         <button v-if="filters.serverId !== 'all'" class="secondary-button" type="button" @click="openLogQueryPage(filters.serverId)">
           <Search :size="18" />

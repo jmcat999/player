@@ -2099,6 +2099,48 @@ th {
 }
 
 /* Settings page */
+.data-maintenance-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.data-maintenance-card {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid #e5edf5;
+  border-radius: 8px;
+  background: #fbfcfe;
+}
+
+.data-maintenance-card > div:first-child {
+  display: grid;
+  gap: 4px;
+}
+
+.data-maintenance-card strong {
+  color: #17202a;
+  font-size: 16px;
+}
+
+.data-maintenance-card span {
+  color: #637083;
+  font-weight: 800;
+}
+
+.data-maintenance-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.data-maintenance-actions .primary-button,
+.data-maintenance-actions .secondary-button {
+  min-height: 40px;
+  padding: 0 12px;
+}
+
 .settings-grid {
   display: flex;
   flex-direction: column;
@@ -2224,6 +2266,20 @@ th {
 }
 
 @media (max-width: 560px) {
+  .data-maintenance-grid,
+  .data-maintenance-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .data-maintenance-card {
+    padding: 12px;
+  }
+
+  .data-maintenance-actions .primary-button,
+  .data-maintenance-actions .secondary-button {
+    width: 100%;
+  }
+
   .settings-grid {
     gap: 1rem;
   }
