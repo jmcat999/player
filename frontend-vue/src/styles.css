@@ -2105,14 +2105,15 @@ th {
 
 .data-maintenance-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
+  gap: 10px;
 }
 
 .data-maintenance-card {
-  display: grid;
-  gap: 10px;
-  padding: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 12px 14px;
   border: 1px solid #e5edf5;
   border-radius: 8px;
   background: #fbfcfe;
@@ -2121,6 +2122,7 @@ th {
 .data-maintenance-card > div:first-child {
   display: grid;
   gap: 4px;
+  min-width: 72px;
 }
 
 .data-maintenance-card strong {
@@ -2129,15 +2131,17 @@ th {
 }
 
 .data-maintenance-actions {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
   gap: 8px;
 }
 
 .data-maintenance-actions .primary-button,
 .data-maintenance-actions .secondary-button {
   min-height: 40px;
-  padding: 0 12px;
+  width: auto;
+  padding: 0 16px;
   font-weight: 800;
 }
 
@@ -2266,13 +2270,14 @@ th {
 }
 
 @media (max-width: 560px) {
-  .data-maintenance-grid,
-  .data-maintenance-actions {
-    grid-template-columns: 1fr;
+  .data-maintenance-card {
+    display: grid;
+    gap: 10px;
+    padding: 12px;
   }
 
-  .data-maintenance-card {
-    padding: 12px;
+  .data-maintenance-actions {
+    justify-content: stretch;
   }
 
   .data-maintenance-actions .primary-button,
