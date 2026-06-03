@@ -2834,7 +2834,7 @@ function toggleAllImportFileSelection(checked) {
       <p v-if="importMessage" class="notice success">{{ importMessage }}</p>
 
       <div v-if="syncConfig" class="settings-grid">
-        <article class="panel wide">
+        <article class="panel data-maintenance-panel">
           <div class="panel-title">
             <h2>数据维护</h2>
             <span>手动复制和解析 CSV</span>
@@ -2843,16 +2843,15 @@ function toggleAllImportFileSelection(checked) {
             <div v-for="server in serverOptions" :key="server.serverId" class="data-maintenance-card">
               <div>
                 <strong>{{ server.serverName }}</strong>
-                <span>{{ formatNumber(sourceStat(server.serverId, 'totalCount')) }} 次方块行为</span>
               </div>
               <div class="data-maintenance-actions">
                 <button class="primary-button" type="button" @click="openSyncPage(server.serverId)">
                   <Download :size="17" />
-                  <span>复制 CSV</span>
+                  <span>前往复制 CSV {{ server.serverName }}</span>
                 </button>
                 <button class="secondary-button" type="button" @click="openImportPage(server.serverId)">
                   <Database :size="17" />
-                  <span>解析入库</span>
+                  <span>前往解析 {{ server.serverName }}</span>
                 </button>
               </div>
             </div>

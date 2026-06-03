@@ -2099,6 +2099,10 @@ th {
 }
 
 /* Settings page */
+.data-maintenance-panel {
+  min-height: 0;
+}
+
 .data-maintenance-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -2107,7 +2111,7 @@ th {
 
 .data-maintenance-card {
   display: grid;
-  gap: 12px;
+  gap: 10px;
   padding: 14px;
   border: 1px solid #e5edf5;
   border-radius: 8px;
@@ -2124,11 +2128,6 @@ th {
   font-size: 16px;
 }
 
-.data-maintenance-card span {
-  color: #637083;
-  font-weight: 800;
-}
-
 .data-maintenance-actions {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -2139,6 +2138,7 @@ th {
 .data-maintenance-actions .secondary-button {
   min-height: 40px;
   padding: 0 12px;
+  font-weight: 800;
 }
 
 .settings-grid {
