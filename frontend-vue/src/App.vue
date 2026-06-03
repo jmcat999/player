@@ -4295,27 +4295,6 @@ function toggleAllImportFileSelection(checked) {
       </button>
     </section>
 
-    <section class="filters" aria-label="筛选">
-      <label>
-        <span>开始</span>
-        <input v-model="filters.from" type="date" @change="loadAll" />
-      </label>
-      <label>
-        <span>结束</span>
-        <input v-model="filters.to" type="date" @change="loadAll" />
-      </label>
-      <label class="search-field">
-        <span>玩家</span>
-        <div class="search-box">
-          <Search :size="17" />
-          <input v-model.trim="filters.player" type="search" placeholder="名称" @keyup.enter="loadAll" />
-        </div>
-      </label>
-      <button class="secondary-button" type="button" @click="loadAll">
-        查询
-      </button>
-    </section>
-
     <p v-if="error" class="notice error">{{ error }}</p>
     <p v-if="importMessage" class="notice success">{{ importMessage }}</p>
 
